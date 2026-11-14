@@ -1,0 +1,100 @@
+using Microsoft.AspNetCore.Mvc;
+using FORA.Data;
+using FORA.Models;
+using FORA.DTOs;
+using Microsoft.AspNetCore.Authorization;
+using System.Security.Claims;
+using Microsoft.EntityFrameworkCore;
+
+namespace FORA.Controllers
+{
+    [ApiController]
+    [Route("api/posts")]
+    public class PostController : ControllerBase
+    {
+        private readonly AppDbContext _db;
+
+        public PostController(AppDbContext db)
+        {
+            _db = db;
+        }
+
+        // POST /api/posts
+        [Authorize]
+        [HttpPost]
+        public IActionResult CreatePost(CreatePostDto dto)
+        {
+            var userId = int.Parse(
+                User.FindFirstValue(ClaimTypes.NameIdentifier)!
+            );
+
+            var post = new Post
+            {
+                UserId = userId,
+                Content = dto.Content,
+                CreatedAt = DateTime.UtcNow
+            };
+
+            _db.Posts.Add(post);
+            _db.SaveChanges();
+
+            if (dto.MediaUrls != null && dto.MediaUrls.Count > 0)
+            {
+                var media = dto.MediaUrls
+                    .Where(url => !string.IsNullOrWhiteSpace(url))
+                    .Select(url => new PostMedia
+                    {
+                        PostId = post.Id,
+                        Url = url.Trim(),
+                        Type = "image",
+                        CreatedAt = DateTime.UtcNow
+                    })
+                    .ToList();
+
+                if (media.Count > 0)
+                {
+                    _db.PostMedia.AddRange(media);
+                    _db.SaveChanges();
+                }
+            }
+
+            return Ok(new
+            {
+                post.Id,
+                post.Content,
+                post.CreatedAt,
+                media = dto.MediaUrls ?? new List<string>()
+            });
+        }
+
+
+        [Authorize]
+        [HttpDelete("{postId:int}")]
+        public async Task<IActionResult> DeletePost(int postId)
+        {
+            var userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+
+            var post = await _db.Posts.FirstOrDefaultAsync(p => p.Id == postId);
+            if (post == null) return NotFound("Post not found");
+
+            if (post.UserId != userId)
+                return Forbid("You cannot delete another user's post");
+
+            var comments = _db.Comments.Where(c => c.PostId == postId);
+            _db.Comments.RemoveRange(comments);
+
+            var likes = _db.PostLikes.Where(l => l.PostId == postId);
+            _db.PostLikes.RemoveRange(likes);
+
+            var media = _db.PostMedia.Where(m => m.PostId == postId);
+            _db.PostMedia.RemoveRange(media);
+
+            _db.Posts.Remove(post);
+            await _db.SaveChangesAsync();
+
+            return Ok(new { message = "Post deleted", postId });
+        }
+
+
+    }
+}

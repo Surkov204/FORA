@@ -1,0 +1,220 @@
+:root{
+  --bg:#0a0a0a;
+  --card:#0f0f10;
+  --line:rgba(255,255,255,.12);
+  --line2:rgba(255,255,255,.18);
+  --text:#f3f3f3;
+  --dim:rgba(255,255,255,.55);
+  --muted:rgba(255,255,255,.08);
+  --radius:18px;
+}
+
+.xlogin-page{
+  min-height:100vh;
+  display:grid;
+  place-items:center;
+  padding:24px;
+  background:
+    linear-gradient(180deg, rgba(255,255,255,.06), transparent 45%),
+    radial-gradient(900px 500px at 50% -10%, rgba(255,255,255,.10), transparent 60%),
+    var(--bg);
+  color:var(--text);
+  font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+  position:relative;
+  overflow:hidden;
+}
+
+/* bỏ glow xanh kiểu X – dùng “paper light” trắng nhẹ */
+.xlogin-glow{
+  position:absolute;
+  inset:-200px;
+  background: radial-gradient(900px 520px at 50% 10%, rgba(255,255,255,.10), transparent 65%);
+  pointer-events:none;
+  filter: blur(2px);
+}
+
+/* CARD khác hẳn: viền kép + bóng sắc nét */
+.xlogin-card{
+  width:min(420px, 92vw);
+  background: linear-gradient(180deg, rgba(255,255,255,.05), transparent 30%), var(--card);
+  border:1px solid var(--line);
+  border-radius: var(--radius);
+  padding:24px;
+  box-shadow:
+    0 18px 60px rgba(0,0,0,.70),
+    inset 0 1px 0 rgba(255,255,255,.06);
+  position:relative;
+}
+
+/* Header kiểu editorial: mark vuông + chữ to */
+.xlogin-head{
+  display:flex;
+  gap:12px;
+  align-items:flex-start;
+  margin-bottom:18px;
+}
+
+.xlogin-mark{
+  width:10px;
+  height:10px;
+  border-radius:4px;
+  background:#ffffff;
+  margin-top:6px;
+  box-shadow:none;
+  opacity:.9;
+}
+
+.xlogin-title{
+  font-size:26px;
+  font-weight:900;
+  letter-spacing:-0.6px;
+  line-height:1.05;
+}
+
+.xlogin-sub{
+  margin-top:6px;
+  font-size:13px;
+  color:var(--dim);
+}
+
+/* Alert: monochrome */
+.xlogin-alert{
+  background: rgba(255,255,255,.06);
+  border:1px solid rgba(255,255,255,.14);
+  padding:10px 12px;
+  border-radius:12px;
+  margin-bottom:12px;
+  font-size:13px;
+}
+
+/* label */
+.xlogin-label{
+  display:block;
+  font-size:12px;
+  color:var(--dim);
+  margin-top:10px;
+  text-transform: uppercase;
+  letter-spacing: .12em;
+}
+
+/* input kiểu outline trắng */
+.xlogin-input{
+  width:100%;
+  margin-top:8px;
+  padding:12px 12px;
+  border-radius:14px;
+  border:1px solid var(--line);
+  background: rgba(0,0,0,.25);
+  color:var(--text);
+  outline:none;
+  transition: border-color .15s ease, box-shadow .15s ease, transform .05s ease;
+}
+
+.xlogin-input::placeholder{
+  color: rgba(255,255,255,.35);
+}
+
+.xlogin-input:focus{
+  border-color: rgba(255,255,255,.50);
+  box-shadow: 0 0 0 4px rgba(255,255,255,.08);
+}
+
+.xlogin-input.is-error{
+  border-color: rgba(255,255,255,.35);
+  box-shadow: 0 0 0 4px rgba(255,255,255,.05);
+}
+
+.xlogin-help{
+  font-size:12px;
+  margin-top:6px;
+  color: rgba(255,255,255,.55);
+}
+.xlogin-help.ghost{ color: transparent; }
+
+.xlogin-row{
+  display:flex;
+  gap:10px;
+  margin-top:8px;
+  align-items:center;
+}
+
+.xlogin-input--pw{
+  margin-top:0;
+  flex:1;
+}
+
+/* nút show/hide: pill trắng mờ */
+.xlogin-ghostBtn{
+  padding:10px 12px;
+  border-radius:999px;
+  border:1px solid var(--line);
+  background: rgba(255,255,255,.06);
+  color: rgba(255,255,255,.85);
+  cursor:pointer;
+  transition: background .15s ease, transform .05s ease;
+}
+.xlogin-ghostBtn:hover{ background: rgba(255,255,255,.10); }
+.xlogin-ghostBtn:active{ transform: scale(.98); }
+
+/* nút primary: trắng nền đen (đảo màu) -> nhìn khác ngay */
+.xlogin-primary{
+  width:100%;
+  margin-top:16px;
+  padding:12px 14px;
+  border-radius:14px;
+  border:1px solid rgba(255,255,255,.15);
+  background:#ffffff;
+  color:#000;
+  font-weight:900;
+  cursor:pointer;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  gap:10px;
+  transition: transform .05s ease, filter .15s ease, opacity .15s ease;
+}
+
+.xlogin-primary:hover{ filter: brightness(.95); }
+.xlogin-primary:active{ transform: scale(.99); }
+.xlogin-primary:disabled{
+  opacity:.45;
+  cursor:not-allowed;
+  filter:none;
+}
+
+.xlogin-primaryIcon{ opacity:.7; }
+
+/* footer links: không underline, chỉ đổi opacity (editorial) */
+.xlogin-footer{
+  margin-top:14px;
+  display:flex;
+  justify-content:space-between;
+  gap:10px;
+}
+
+.xlogin-link{
+  background:transparent;
+  border:none;
+  color: rgba(255,255,255,.65);
+  cursor:pointer;
+  padding:0;
+  font-size:12px;
+  text-decoration:none;
+}
+.xlogin-link:hover{ color: rgba(255,255,255,.95); }
+
+/* toast: viền trắng nhẹ */
+.xlogin-toast{
+  margin-top:14px;
+  font-size:13px;
+  padding:10px 12px;
+  border-radius:12px;
+  border:1px solid rgba(255,255,255,.14);
+  background: rgba(255,255,255,.06);
+  animation: xfadeIn .15s ease;
+}
+
+@keyframes xfadeIn{
+  from{ opacity:0; transform: translateY(3px); }
+  to{ opacity:1; transform: translateY(0); }
+}

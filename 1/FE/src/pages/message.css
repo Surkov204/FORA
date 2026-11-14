@@ -1,0 +1,344 @@
+:root{
+  --bg:#000000;
+  --panel:#000000;
+  --card:#16181c;
+  --card2:#0f1419;
+  --line:#2f3336;
+  --text:#e7e9ea;
+  --muted:#71767b;
+  --accent:#1d9bf0;
+
+  --r999:9999px;
+}
+
+*{ box-sizing:border-box; }
+html,body{ height:100%; }
+body{ margin:0; background:var(--bg); color:var(--text); }
+
+.messenger-x{
+  height:100vh;
+  display:flex;
+  overflow:hidden;
+  background:var(--bg);
+}
+
+/* LEFT */
+.x-side{
+  width: 360px;
+  border-right:1px solid var(--line);
+  display:flex;
+  flex-direction:column;
+  background:var(--panel);
+}
+
+.x-side-header{
+  padding: 12px 16px;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  border-bottom:1px solid var(--line);
+}
+
+.x-title{
+  font-size:20px;
+  font-weight:800;
+  letter-spacing:.2px;
+}
+
+.x-iconbtn{
+  width:36px;height:36px;
+  display:grid;place-items:center;
+  border:none;
+  background:transparent;
+  color:var(--text);
+  border-radius:var(--r999);
+  cursor:pointer;
+}
+.x-iconbtn:hover{ background: rgba(255,255,255,.06); }
+
+.x-search{
+  padding: 12px 16px;
+  border-bottom:1px solid var(--line);
+}
+
+.x-searchbar{
+  position:relative;
+  background: var(--card2);
+  border:1px solid transparent;
+  border-radius:var(--r999);
+  display:flex;
+  align-items:center;
+  padding: 10px 12px 10px 40px;
+}
+.x-searchbar:focus-within{
+  border-color: var(--accent);
+  background: #000;
+}
+.x-searchbar svg{
+  position:absolute;
+  left:14px;
+  color:var(--muted);
+}
+.x-searchbar input{
+  width:100%;
+  background:transparent;
+  border:none;
+  outline:none;
+  color:var(--text);
+  font-size:14px;
+}
+
+/* conversation list */
+.x-list{ flex:1; overflow:auto; }
+
+.x-conv{
+  width:100%;
+  border:none;
+  background:transparent;
+  color:inherit;
+  cursor:pointer;
+  padding: 12px 16px;
+  display:flex;
+  gap:12px;
+  transition:.15s;
+}
+.x-conv:hover{ background: rgba(255,255,255,.03); }
+.x-conv.active{
+  background: rgba(29,155,240,.08);
+  border-right: 2px solid var(--accent);
+}
+
+.x-avatar{
+  width:44px;height:44px;
+  border-radius:var(--r999);
+  background: #111;
+  border:1px solid var(--line);
+  display:grid;place-items:center;
+  position:relative;
+  flex:0 0 auto;
+}
+.x-online{
+  position:absolute;
+  right:2px; bottom:2px;
+  width:10px;height:10px;
+  border-radius:var(--r999);
+  background:#00ba7c;
+  border:2px solid var(--bg);
+}
+
+.x-conv-main{ flex:1; min-width:0; }
+.x-row{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  gap:10px;
+}
+.x-name{
+  font-weight:800;
+  font-size:15px;
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+}
+.x-time{
+  font-size:12px;
+  color:var(--muted);
+  flex:0 0 auto;
+}
+.x-last{
+  margin-top:4px;
+  font-size:13px;
+  color:var(--muted);
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+}
+.x-badge{
+  min-width:22px;
+  height:18px;
+  padding:0 6px;
+  border-radius:var(--r999);
+  background: var(--accent);
+  color:#fff;
+  font-size:11px;
+  font-weight:800;
+  display:grid;place-items:center;
+}
+
+/* RIGHT */
+.x-chat{
+  flex:1;
+  display:flex;
+  flex-direction:column;
+  background: var(--bg);
+}
+
+.x-chat-header{
+  height:60px;
+  border-bottom:1px solid var(--line);
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  padding: 0 16px;
+  background: rgba(0,0,0,.85);
+}
+
+.x-user{
+  display:flex;
+  align-items:center;
+  gap:12px;
+}
+.x-user .x-avatar{ width:40px;height:40px; }
+.x-user-name{ font-weight:900; font-size:15px; }
+.x-user-sub{
+  font-size:12px;
+  color:var(--muted);
+  margin-top:2px;
+}
+
+/* feed */
+.x-feed{
+  flex:1;
+  overflow:auto;
+  padding: 16px 24px;   /* chừa khoảng cho actions */
+  display:flex;
+  flex-direction:column;
+  gap: 14px;
+}
+
+/* message row */
+.x-msg{
+  display:flex;
+  gap:10px;
+  align-items:flex-end;
+  max-width: 720px;
+}
+.x-msg.me{ margin-left:auto; justify-content:flex-end; }
+.x-msg.them{ margin-right:auto; }
+
+/* wrapper giữ bubble + meta */
+.x-msg-body{
+  position:relative;
+}
+
+/* bubble */
+.x-bubble{
+  position:relative;
+  overflow:visible;
+  border:1px solid var(--line);
+  background: var(--card);
+  border-radius: 18px;
+  padding: 10px 12px;
+  font-size:15px;
+  line-height:1.35;
+}
+
+.x-msg.me .x-bubble{
+  background: rgba(29,155,240,.12);
+  border-color: rgba(29,155,240,.35);
+}
+
+.x-meta{
+  margin-top:6px;
+  font-size:11px;
+  color:var(--muted);
+  padding: 0 4px;
+  display:flex;
+  gap:8px;
+  align-items:center;
+}
+
+
+
+/* ACTIONS (base) */
+.x-actions{
+  position:absolute;
+  top:50%;
+  transform: translateY(-50%);
+  display:flex;
+  gap:6px;
+  opacity:0;
+  pointer-events:none;
+    transition: opacity .18s ease, transform .18s ease;
+}
+
+.x-bubble:hover .x-actions{
+  opacity:1;
+  pointer-events:auto;
+}
+
+/* ✅ them: actions bên PHẢI bubble */
+.x-msg.them .x-actions{
+  right:-70px;
+  left:auto;
+}
+
+/* ✅ me: actions bên TRÁI bubble */
+.x-msg.me .x-actions{
+  left:-70px;
+  right:auto;
+}
+
+/* tránh bị đè vào avatar bên trái của them */
+.x-msg.them{
+  padding-right: 50px; /* chừa bên phải để actions không bị dính */
+}
+
+/* buttons */
+.x-mini{
+  width:28px;height:28px;
+  border:none;
+  background: rgba(255,255,255,.06);
+  color:var(--text);
+  border-radius: var(--r999);
+  cursor:pointer;
+}
+.x-mini:hover{ background: rgba(255,255,255,.10); }
+
+/* composer */
+.x-footer{
+  border-top:1px solid var(--line);
+  padding: 12px 16px;
+  background: rgba(0,0,0,.9);
+}
+.x-compose{
+  max-width: 920px;
+  margin: 0 auto;
+  display:flex;
+  align-items:center;
+  gap:10px;
+  border:1px solid var(--line);
+  background: var(--card2);
+  border-radius: 18px;
+  padding: 10px 10px;
+}
+.x-input{
+  flex:1;
+  background:transparent;
+  border:none;
+  outline:none;
+  color:var(--text);
+  font-size:14px;
+  padding: 6px 8px;
+}
+.x-send{
+  width:38px;height:38px;
+  border:none;
+  border-radius: var(--r999);
+  background: var(--accent);
+  color:#fff;
+  cursor:pointer;
+  display:grid;place-items:center;
+}
+.x-send:hover{ filter: brightness(1.05); }
+
+/* scrollbar */
+.x-list::-webkit-scrollbar,
+.x-feed::-webkit-scrollbar{ width:10px; }
+.x-list::-webkit-scrollbar-thumb,
+.x-feed::-webkit-scrollbar-thumb{
+  background: rgba(255,255,255,.10);
+  border-radius: var(--r999);
+  border: 2px solid transparent;
+  background-clip: content-box;
+}

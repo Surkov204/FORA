@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="vi">
+
+<head>
+    <meta charset="utf-8" />
+    <title>Profile</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css" />
+    <link rel="icon" type="image/png"
+        href="https://res.cloudinary.com/do48qpmut/image/upload/v1769066241/fora/img_1769066223720.png">
+
+</head>
+
+<body>
+
+    <div class="app-layout">
+
+        <aside class="identity-col">
+            <div class="dark-card profile-card">
+                <div class="cover-bg"></div>
+                <div class="profile-main">
+                    <div class="avatar-wrapper">
+                        <img id="avatar"
+                            src="https://i.pinimg.com/736x/01/6c/6f/016c6fd3571087621dc810ecfad542a9.jpg" />
+
+                        <div class="avatar-overlay" onclick="document.getElementById('avatarFile').click()">
+                            <i class="fa-solid fa-camera"></i>
+                            <span>Change</span>
+                        </div>
+
+                        <input type="file" id="avatarFile" accept="image/*" hidden
+                            onchange="handleAvatarSelect(event)" />
+                    </div>
+                    <h1 id="displayName">Dark User</h1>
+                    <p class="handle">@dark_mode_lover</p>
+                    <p id="bio" class="bio">Code is poetry.<br>Living in the terminal.</p>
+
+                    <div class="stats-row">
+                        <div class="stat"><b>125</b><span>Post</span></div>
+                        <div class="stat"><b>10k</b><span>Followers</span></div>
+                        <div class="stat"><b>340</b><span>Following</span></div>
+                    </div>
+
+                    <div class="action-buttons">
+                        <button class="btn-primary" onclick="toggleEdit()"><i class="fa-solid fa-pen"></i> Edit</button>
+                        <button class="btn-secondary"><i class="fa-regular fa-envelope"></i> Message</button>
+                    </div>
+                </div>
+
+                <div id="editBox" class="edit-drawer hidden">
+                    <div class="drawer-header">UPDATE INFO</div>
+                    <input id="nameInput" placeholder="Name" />
+                    <input id="bioInput" placeholder="Bio" />
+                    <input id="avatarInput" placeholder="Avatar URL" />
+                    <button class="btn-save" onclick="updateProfile()">Save Changes</button>
+                </div>
+            </div>
+
+            <div class="dark-card menu-card">
+                <a href="#" class="menu-item active"><i class="fa-solid fa-house"></i> Home</a>
+                <a href="#" class="menu-item"><i class="fa-solid fa-bell"></i> Notifications</a>
+                <a href="#" class="menu-item"><i class="fa-solid fa-bookmark"></i> Bookmarks</a>
+                <a href="#" class="menu-item"><i class="fa-solid fa-image"></i> Media</a>
+                <a href="#" class="menu-item"><i class="fa-solid fa-gear"></i> Settings</a>
+            </div>
+        </aside>
+
+        <main class="content-col">
+
+            <div class="dark-card composer-card">
+                <div class="composer-top">
+                    <img id="avatar-mini" src="https://i.pinimg.com/736x/01/6c/6f/016c6fd3571087621dc810ecfad542a9.jpg"
+                        class="avatar-tiny">
+                    <textarea id="postContent" placeholder="What is happening?!"></textarea>
+                </div>
+                <div class="composer-actions">
+                    <div class="action-icons">
+                        <i class="fa-regular fa-image icon-btn"></i>
+                        <i class="fa-solid fa-video icon-btn"></i>
+                        <i class="fa-solid fa-face-smile icon-btn"></i>
+                        <i class="fa-solid fa-calendar-days icon-btn"></i>
+                    </div>
+                    <button class="post-btn" onclick="createPost()">Post</button>
+                </div>
+            </div>
+
+            <div class="feed-filter">
+                <span class="active">Latest</span>
+                <span>Top</span>
+                <span>Media</span>
+            </div>
+
+            <div id="posts" class="feed-grid"></div>
+
+        </main>
+    </div>
+
+    <script src="profile.js"></script>
+</body>
+
+</html>

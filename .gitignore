@@ -1,0 +1,20 @@
+# Build outputs and dependencies
+**/bin/
+**/obj/
+**/node_modules/
+**/dist/
+**/dist-ssr/
+.local-tools/
+
+# Editors and local files
+.idea/
+.vs/
+*.user
+*.suo
+*.log
+.env
+.env.*
+!.env.example
+
+# Preserved history of the former nested repository
+.git-repo-backups/
