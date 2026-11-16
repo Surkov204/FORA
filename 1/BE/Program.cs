@@ -1,14 +1,28 @@
 using FORA.Data;
+using FORA.DTOs;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.OData;
 using Microsoft.IdentityModel.Tokens;
+using Microsoft.OData.ModelBuilder;
+using System.Security.Claims;
 using System.Text;
 using FORA.Services;
 using FORA.Repositories;
 var builder = WebApplication.CreateBuilder(args);
 
 // 🔹 ADD SERVICES
-builder.Services.AddControllers();
+const int maxPostPageSize = 50;
+var odataModel = new ODataConventionModelBuilder();
+odataModel.EntitySet<PostQueryDto>("Posts");
+builder.Services.AddControllers().AddOData(options => options
+    .Select()
+    .Filter()
+    .OrderBy()
+    .Count()
+    .SkipToken()
+    .SetMaxTop(maxPostPageSize)
+    .AddRouteComponents("odata", odataModel.GetEdmModel()));
 builder.Services.AddScoped<ICommentService, CommentService>();
 builder.Services.AddScoped<IEmailSender, EmailSender>();
 builder.Services.AddScoped<ICommentRepository, CommentRepository>();
@@ -31,8 +45,14 @@ builder.Services.AddDbContext<AppDbContext>(options =>
         builder.Configuration.GetConnectionString("DefaultConnection"))
 );
 
-builder.Services.AddAuthentication("Bearer")
-    .AddJwtBearer("Bearer", options =>
+var jwtKey = builder.Configuration["Jwt:Key"];
+if (string.IsNullOrWhiteSpace(jwtKey) || Encoding.UTF8.GetByteCount(jwtKey) < 32)
+{
+    throw new InvalidOperationException("Set Jwt__Key to a secret of at least 32 bytes.");
+}
+
+builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+    .AddJwtBearer(options =>
     {
         options.TokenValidationParameters = new TokenValidationParameters
         {
@@ -40,11 +60,23 @@ builder.Services.AddAuthentication("Bearer")
             ValidateAudience = true,
             ValidateLifetime = true,
             ValidateIssuerSigningKey = true,
+            ValidAlgorithms = [SecurityAlgorithms.HmacSha256],
             ValidIssuer = builder.Configuration["Jwt:Issuer"],
             ValidAudience = builder.Configuration["Jwt:Audience"],
-            IssuerSigningKey = new SymmetricSecurityKey(
-                Encoding.UTF8.GetBytes(builder.Configuration["Jwt:Key"])
-            )
+            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey))
+        };
+        options.Events = new JwtBearerEvents
+        {
+            OnTokenValidated = context =>
+            {
+                if (!int.TryParse(context.Principal?.FindFirstValue(ClaimTypes.NameIdentifier), out var userId)
+                    || userId <= 0)
+                {
+                    context.Fail("The token must identify a user.");
+                }
+
+                return Task.CompletedTask;
+            }
         };
     });
 

@@ -1,7 +1,10 @@
 param([string]$BaseUrl = 'http://localhost:5106', [switch]$CheckUI)
 $ErrorActionPreference = 'Stop'
 $config = Get-Content (Join-Path $PSScriptRoot '../appsettings.json') -Raw | ConvertFrom-Json
-$connection = New-Object System.Data.SqlClient.SqlConnection($config.ConnectionStrings.DefaultConnection)
+if (!$env:Jwt__Key) { throw 'Set Jwt__Key to the same secret used by the test API.' }
+$connectionString = $env:ConnectionStrings__DefaultConnection
+if (!$connectionString) { $connectionString = $config.ConnectionStrings.DefaultConnection }
+$connection = New-Object System.Data.SqlClient.SqlConnection($connectionString)
 $connection.Open()
 $marker = 'social-smoke-' + [Guid]::NewGuid().ToString('N')
 $ids = @()
@@ -17,12 +20,13 @@ function Token([int]$id) {
     $claims = @{ sub = "$id"; iss = $config.Jwt.Issuer; aud = $config.Jwt.Audience; exp = [DateTimeOffset]::UtcNow.ToUnixTimeSeconds() + 600 }
     $payload = Encode ([Text.Encoding]::UTF8.GetBytes(($claims | ConvertTo-Json -Compress)))
     $hmac = New-Object Security.Cryptography.HMACSHA256
-    $hmac.Key = [Text.Encoding]::UTF8.GetBytes($config.Jwt.Key)
+    $hmac.Key = [Text.Encoding]::UTF8.GetBytes($env:Jwt__Key)
     try { $signature = Encode ($hmac.ComputeHash([Text.Encoding]::UTF8.GetBytes("$header.$payload"))) } finally { $hmac.Dispose() }
     "$header.$payload.$signature"
 }
-function Api([string]$method, [string]$path, $body = $null, [string]$bearer = $script:tokenA) {
-    $parameters = @{ Uri = "$BaseUrl/api$path"; Method = $method; Headers = @{ Authorization = "Bearer $bearer" }; ContentType = 'application/json' }
+function Api([string]$method, [string]$path, $body = $null, [string]$bearer = $script:tokenA, [string]$prefix = '/api') {
+    $parameters = @{ Uri = "$BaseUrl$prefix$path"; Method = $method; ContentType = 'application/json' }
+    if ($bearer) { $parameters.Headers = @{ Authorization = "Bearer $bearer" } }
     if ($null -ne $body) { $parameters.Body = $body | ConvertTo-Json -Compress }
     Invoke-RestMethod @parameters
 }
@@ -44,6 +48,21 @@ try {
     Assert $true 'Unauthenticated feed rejected'
     $post = Api POST '/posts' @{ content = "$marker original" } $tokenB
     $postId = $post.id
+    ExpectStatus 401 { Api GET '/odata/Posts' -bearer '' -prefix '' }
+    ExpectStatus 401 { Api GET '/odata/Posts' -bearer 'invalid-token' -prefix '' }
+    ExpectStatus 401 { Api GET '/odata/Posts' -bearer (Token 0) -prefix '' }
+    Assert $true 'OData requires a valid user token'
+    $filter = [uri]::EscapeDataString("Id eq $postId and contains(Content,'$marker')")
+    $query = '/odata/Posts?$filter={0}&$select=Id,Content&$orderby=Id%20desc&$top=1&$count=true' -f $filter
+    $odata = Api GET $query -prefix ''
+    Assert ($odata.'@odata.count' -eq 1 -and @($odata.value).Count -eq 1 -and
+        $odata.value[0].Id -eq $postId -and $odata.value[0].Content -eq "$marker original" -and
+        !$odata.value[0].PSObject.Properties['UserId']) 'OData filters, orders, counts, and selects posts'
+    ExpectStatus 400 { Api GET '/odata/Posts?$top=51' -prefix '' }
+    ExpectStatus 400 { Api GET '/odata/Posts?$skip=10001' -prefix '' }
+    ExpectStatus 400 { Api GET '/odata/Posts?$expand=User' -prefix '' }
+    ExpectStatus 400 { Api GET '/odata/Posts?$select=PasswordHash' -prefix '' }
+    Assert $true 'OData enforces query limits and the post schema'
     $feed = Api GET "/social/feed?q=$marker"
     Assert (@($feed.items).Count -eq 1) 'Search returns matching post'
     $people = Api GET "/social/people?q=$marker"
@@ -85,6 +104,18 @@ try {
     Api DELETE "/posts/$postId" $null $tokenB | Out-Null
     $saved = Api GET "/social/feed?tab=saved&q=$marker"
     Assert (@($saved.items).Count -eq 0) 'Delete cascades saved post'
+
+    foreach ($number in 1..21) {
+        Api POST '/posts' @{ content = "$marker page $number" } $tokenB | Out-Null
+    }
+    $query = '/odata/Posts?$filter=UserId%20eq%20{0}&$select=Content&$orderby=CreatedAt%20desc&$top=21' -f $ids[1]
+    $firstPage = Api GET $query -prefix ''
+    Assert (@($firstPage.value).Count -eq 20 -and $firstPage.'@odata.nextLink') 'OData provides a continuation after 20 posts'
+    $nextPath = ([uri]$firstPage.'@odata.nextLink').PathAndQuery
+    $secondPage = Api GET $nextPath -prefix ''
+    Assert (@($secondPage.value).Count -eq 1 -and
+        $secondPage.value[0].Content -eq "$marker page 1" -and
+        !$secondPage.'@odata.nextLink') 'OData continuation returns the remaining post'
 } finally {
     if ($ids.Count) {
         $list = $ids -join ','

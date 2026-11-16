@@ -9,6 +9,7 @@
   <ItemGroup>
     <PackageReference Include="BCrypt.Net-Next" Version="4.0.3" />
     <PackageReference Include="Google.Apis.Auth" Version="1.69.0" />
+    <PackageReference Include="Microsoft.AspNetCore.OData" Version="9.5.0" />
     <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="8.0.7" />
 
     <!-- EF Core 8.x (PIN VERSION) -->
@@ -20,6 +21,7 @@
      <!-- ✅ JWT Bearer 8.x -->
   <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="8.0.7" />
     <PackageReference Include="Swashbuckle.AspNetCore" Version="6.5.0" />
+    <PackageReference Include="System.Text.Json" Version="8.0.6" />
   </ItemGroup>
 
 </Project>
