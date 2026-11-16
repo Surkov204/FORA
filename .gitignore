@@ -5,6 +5,7 @@
 **/dist/
 **/dist-ssr/
 .local-tools/
+.qa/
 
 # Editors and local files
 .idea/

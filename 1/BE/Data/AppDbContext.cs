@@ -13,10 +13,18 @@ namespace FORA.Data
         public DbSet<PostLike> PostLikes => Set<PostLike>();
         public DbSet<Comment> Comments => Set<Comment>();
         public DbSet<PostMedia> PostMedia => Set<PostMedia>();
+        public DbSet<UserFollow> UserFollows => Set<UserFollow>();
+        public DbSet<PostBookmark> PostBookmarks => Set<PostBookmark>();
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             base.OnModelCreating(modelBuilder);
+            modelBuilder.Entity<UserFollow>().HasKey(x => new { x.FollowerId, x.FollowingId });
+            modelBuilder.Entity<UserFollow>().HasOne<User>().WithMany().HasForeignKey(x => x.FollowerId).OnDelete(DeleteBehavior.NoAction);
+            modelBuilder.Entity<UserFollow>().HasOne<User>().WithMany().HasForeignKey(x => x.FollowingId).OnDelete(DeleteBehavior.NoAction);
+            modelBuilder.Entity<PostBookmark>().HasKey(x => new { x.UserId, x.PostId });
+            modelBuilder.Entity<PostBookmark>().HasOne<User>().WithMany().HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.NoAction);
+            modelBuilder.Entity<PostBookmark>().HasOne<Post>().WithMany().HasForeignKey(x => x.PostId).OnDelete(DeleteBehavior.Cascade);
 
             // PostLike composite key
             modelBuilder.Entity<PostLike>()
@@ -32,7 +40,7 @@ namespace FORA.Data
                 .HasOne<User>()
                 .WithMany()
                 .HasForeignKey(pl => pl.UserId)
-                .OnDelete(DeleteBehavior.Cascade);
+                .OnDelete(DeleteBehavior.NoAction);
 
             // User - Profile (1-1)
             modelBuilder.Entity<UserProfile>()

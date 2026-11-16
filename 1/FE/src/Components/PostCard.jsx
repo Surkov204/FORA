@@ -16,6 +16,9 @@ export default function PostCard({
 
   currentUserAvatar,
   onDelete,
+  onEdit,
+  onBookmark,
+  busy = false,
 }) {
   return (
     <div className="post-card" data-post-id={post.id}>
@@ -25,6 +28,7 @@ export default function PostCard({
           <span className="p-name">{post.userDisplayName || "User"}</span>
           <span className="p-time">{formatTime(post.createdAt)}</span>
         </div>
+        {onEdit && <button className="act-btn" type="button" onClick={onEdit} aria-label="Edit post" disabled={busy}><i className="fa-solid fa-pen" /></button>}
         {onDelete && (
           <button
             className="post-menu-btn"
@@ -62,15 +66,13 @@ export default function PostCard({
           <span>{post.commentCount || 0}</span>
         </button>
 
-        <button className="act-btn share" type="button">
-          <i className="fa-solid fa-retweet"></i>
-          <span>0</span>
-        </button>
+        {onBookmark && <button className={`act-btn ${post.isSaved ? "saved" : ""}`} type="button" onClick={onBookmark} disabled={busy} aria-label={post.isSaved ? "Unsave post" : "Save post"} aria-pressed={!!post.isSaved}><i className={post.isSaved ? "fa-solid fa-bookmark" : "fa-regular fa-bookmark"} /></button>}
 
         <button
           className={`act-btn heart ${post.isLiked ? "liked" : ""}`}
           type="button"
           onClick={() => onToggleLike(post.id)}
+          disabled={busy}
         >
           <i
             className={post.isLiked ? "fa-solid fa-heart" : "fa-regular fa-heart"}
@@ -78,9 +80,6 @@ export default function PostCard({
           <span className="like-count">{post.likeCount || 0}</span>
         </button>
 
-        <button className="act-btn" type="button">
-          <i className="fa-solid fa-share-nodes"></i>
-        </button>
       </div>
 
       <CommentSection

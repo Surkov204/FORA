@@ -8,5 +8,7 @@ namespace FORA.DTOs
         public string? AvatarUrl { get; set; }
         public DateTime CreatedAt { get; set; }
         public int PostCount { get; set; }
+        public int FollowerCount { get; set; }
+        public int FollowingCount { get; set; }
     }
 }

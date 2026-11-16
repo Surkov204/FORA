@@ -5,6 +5,7 @@ import VerifyEmail from "./pages/VerifyEmail";
 import ForgotPassword from "./pages/ForgotPassword";
 import ResetPassword from "./pages/ResetPassword";
 import Home from "./pages/Home"
+import Feed from "./pages/Feed";
 
 
 function App() {
@@ -22,6 +23,7 @@ function App() {
       <Route path="/forgot-password" element={<ForgotPassword />} />
       <Route path="/reset-password" element={<ResetPassword />} />
       <Route path="/home" element={<Home />} />
+      <Route path="/feed" element={<Feed />} />
 
       {/* Redirect tất cả về /auth */}
       <Route path="*" element={<Navigate to="/auth" replace />} />

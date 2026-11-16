@@ -1,0 +1,99 @@
+using System.ComponentModel.DataAnnotations;
+using System.Security.Claims;
+using FORA.Data;
+using FORA.Models;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+
+namespace FORA.Controllers;
+
+[ApiController, Authorize, Route("api/social")]
+public class SocialController(AppDbContext db) : ControllerBase
+{
+    private int CurrentId => int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+
+    [HttpGet("feed")]
+    public async Task<IActionResult> Feed(string? q, string tab = "latest", int page = 1, int pageSize = 10)
+    {
+        if (page < 1 || page > 100000 || pageSize < 1 || pageSize > 50) return BadRequest(new { message = "Invalid pagination." });
+        if (!new[] { "latest", "following", "saved" }.Contains(tab)) return BadRequest();
+        var id = CurrentId;
+        var query = db.Posts.AsNoTracking().AsQueryable();
+        if (!string.IsNullOrWhiteSpace(q)) query = query.Where(p => p.Content.Contains(q.Trim()) || p.User.Profile!.DisplayName.Contains(q.Trim()));
+        if (tab == "following") query = query.Where(p => db.UserFollows.Any(f => f.FollowerId == id && f.FollowingId == p.UserId));
+        if (tab == "saved") query = query.Where(p => db.PostBookmarks.Any(b => b.UserId == id && b.PostId == p.Id));
+        var total = await query.CountAsync();
+        var items = await query.OrderByDescending(p => p.CreatedAt).ThenByDescending(p => p.Id)
+            .Skip((page - 1) * pageSize).Take(pageSize).Select(p => new {
+                p.Id, p.UserId, p.Content, p.CreatedAt,
+                LikeCount = db.PostLikes.Count(l => l.PostId == p.Id),
+                CommentCount = db.Comments.Count(c => c.PostId == p.Id),
+                UserDisplayName = p.User.Profile != null ? p.User.Profile.DisplayName : "User",
+                UserAvatar = p.User.Profile != null ? p.User.Profile.AvatarUrl : null,
+                IsLiked = db.PostLikes.Any(l => l.PostId == p.Id && l.UserId == id),
+                IsSaved = db.PostBookmarks.Any(b => b.PostId == p.Id && b.UserId == id),
+                Media = p.Media.OrderBy(m => m.Id).Select(m => new { m.Url, m.Type }).ToList()
+            }).ToListAsync();
+        return Ok(new { items, total, hasMore = (long)page * pageSize < total });
+    }
+
+    [HttpGet("people")]
+    public async Task<IActionResult> People(string? q, int page = 1)
+    {
+        if (page < 1 || page > 100000) return BadRequest();
+        var id = CurrentId;
+        var query = db.UserProfiles.AsNoTracking().Where(p => p.UserId != id);
+        if (!string.IsNullOrWhiteSpace(q)) query = query.Where(p => p.DisplayName.Contains(q.Trim()));
+        return Ok(await query.OrderBy(p => p.DisplayName).ThenBy(p => p.UserId).Skip((page - 1) * 10).Take(10).Select(p => new {
+            p.UserId, p.DisplayName, p.AvatarUrl, p.Bio,
+            IsFollowing = db.UserFollows.Any(f => f.FollowerId == id && f.FollowingId == p.UserId),
+            FollowerCount = db.UserFollows.Count(f => f.FollowingId == p.UserId)
+        }).ToListAsync());
+    }
+
+    [HttpGet("stats")]
+    public async Task<IActionResult> Stats() => Ok(new {
+        followerCount = await db.UserFollows.CountAsync(f => f.FollowingId == CurrentId),
+        followingCount = await db.UserFollows.CountAsync(f => f.FollowerId == CurrentId)
+    });
+
+    [HttpPut("follow/{userId:int}")]
+    public async Task<IActionResult> Follow(int userId, ToggleRequest request)
+    {
+        var id = CurrentId;
+        if (id == userId) return BadRequest(new { message = "You cannot follow yourself." });
+        if (!await db.Users.AnyAsync(u => u.Id == userId)) return NotFound();
+        var follow = await db.UserFollows.FindAsync(id, userId);
+        if (request.Active && follow == null) db.UserFollows.Add(new() { FollowerId = id, FollowingId = userId });
+        if (!request.Active && follow != null) db.UserFollows.Remove(follow);
+        await db.SaveChangesAsync();
+        return Ok(new { isFollowing = request.Active });
+    }
+
+    [HttpPut("bookmarks/{postId:int}")]
+    public async Task<IActionResult> Bookmark(int postId, ToggleRequest request)
+    {
+        if (!await db.Posts.AnyAsync(p => p.Id == postId)) return NotFound();
+        var bookmark = await db.PostBookmarks.FindAsync(CurrentId, postId);
+        if (request.Active && bookmark == null) db.PostBookmarks.Add(new() { UserId = CurrentId, PostId = postId });
+        if (!request.Active && bookmark != null) db.PostBookmarks.Remove(bookmark);
+        await db.SaveChangesAsync();
+        return Ok(new { isSaved = request.Active });
+    }
+
+    [HttpPut("posts/{postId:int}")]
+    public async Task<IActionResult> Edit(int postId, EditPostRequest request)
+    {
+        if (string.IsNullOrWhiteSpace(request.Content)) return BadRequest(new { message = "Post content is required." });
+        var post = await db.Posts.FindAsync(postId);
+        if (post == null) return NotFound();
+        if (post.UserId != CurrentId) return Forbid();
+        post.Content = request.Content.Trim();
+        await db.SaveChangesAsync();
+        return Ok(new { post.Id, post.Content });
+    }
+}
+
+public record ToggleRequest(bool Active);
+public record EditPostRequest([Required, MaxLength(5000)] string Content);

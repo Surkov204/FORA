@@ -542,15 +542,13 @@ export default function Profile() {
                 </div>
 
                 <div className="dark-card menu-card">
-                    <Link className="menu-item active" to="/home">
+                    <Link className="menu-item active" to="/feed">
                         <i className="fa-solid fa-house"></i> Home
                     </Link>
                     <a className="menu-item" href="#">
                         <i className="fa-solid fa-bell"></i> Notifications
                     </a>
-                    <a className="menu-item" href="#">
-                        <i className="fa-solid fa-bookmark"></i> Bookmarks
-                    </a>
+                    <Link className="menu-item" to="/feed?tab=saved"><i className="fa-solid fa-bookmark"></i> Bookmarks</Link>
                     <a className="menu-item" href="#">
                         <i className="fa-solid fa-image"></i> Media
                     </a>

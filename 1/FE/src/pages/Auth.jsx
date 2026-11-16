@@ -1,4 +1,4 @@
-﻿import { useMemo, useState, useEffect, useRef } from "react";
+import { useMemo, useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import "./auth.css";
 const API = "/api";
@@ -172,7 +172,7 @@ export default function Auth() {
             localStorage.setItem("token", data.token);
             localStorage.setItem("currentUser", JSON.stringify(data.user));
             setToast("Đăng nhập OK ✅");
-            navigate("/profile");
+            navigate("/feed");
         } catch {
             setServerError("Không kết nối được server");
         } finally {
@@ -340,7 +340,7 @@ export default function Auth() {
             localStorage.setItem("currentUser", JSON.stringify(data.user));
             setToast("Google login OK");
             pushGoogleDebug({ stage: "server_google_success", lastError: "" });
-            navigate("/profile");
+            navigate("/feed");
         } catch (err) {
             setServerError("Khong ket noi duoc server");
             pushGoogleDebug({
