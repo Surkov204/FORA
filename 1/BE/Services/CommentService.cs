@@ -11,7 +11,8 @@ public sealed class CommentService(ICommentRepository repository) : ICommentServ
     public async Task<ServiceResult> AddAsync(int userId, CreateCommentDto request)
     {
         if (string.IsNullOrWhiteSpace(request.Content)) return InvalidContent();
-        var comment = await repository.AddAsync(request.PostId, userId, request.ParentCommentId, request.Content.Trim());
+        var comment = await repository.AddAsync(request.PostId, userId,
+            request.ParentCommentId, request.ReplyToCommentId, request.Content.Trim());
         if (comment is null)
         {
             return ServiceResult.From(StatusCodes.Status400BadRequest, new { message = "The post or parent comment is unavailable." });

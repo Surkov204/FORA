@@ -31,7 +31,7 @@ const mapGoogleReasonToMessage = (reason) => {
 export default function Auth() {
     const navigate = useNavigate();
     const returnTo = useLocation().state?.returnTo;
-    const destination = typeof returnTo === "string" && /^\/posts\/\d+(?:\?[^#]*)?$/.test(returnTo) ? returnTo : "/feed";
+    const destination = typeof returnTo === "string" && /^\/(?:posts|members)\/\d+(?:\?[^#]*)?$/.test(returnTo) ? returnTo : "/feed";
 
     // tab: "login" | "register"
     const [tab, setTab] = useState("login");

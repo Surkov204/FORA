@@ -150,10 +150,10 @@ export default function CommentSection({
     onCountChange?.(result.total);
   }
 
-  function createComment(content, parentCommentId = null) {
+  function createComment(content, parentCommentId = null, replyToCommentId = null) {
     return run(async () => {
       const result = await request("/api/comments", {
-        method: "POST", body: { postId, parentCommentId, content: content.trim() },
+        method: "POST", body: { postId, parentCommentId, replyToCommentId, content: content.trim() },
       });
       if (result.comment) updateDiscussion(result, result.comment.id, parentCommentId);
       if (parentCommentId) setExpanded(previous => ({ ...previous, [parentCommentId]: true }));
@@ -189,7 +189,7 @@ export default function CommentSection({
       <div className="thread-comment-header">
         {active && <Avatar src={row.userAvatarUrl} className="c-avatar" alt="" />}
         <div>
-          {active && <strong>{row.userDisplayName}</strong>}
+          {active && <Link className="member-link" to={"/members/" + row.userId}><strong>{row.userDisplayName}</strong></Link>}
           <time dateTime={row.createdAt}>{formatTime(row.createdAt)}</time>
           {row.editedAt && <span className="thread-meta">Edited</span>}
         </div>
@@ -209,7 +209,7 @@ export default function CommentSection({
       {activeEditor && <CommentForm
         label={activeEditor.mode === "edit" ? "Edit comment" : "Reply to " + row.userDisplayName}
         value={activeEditor.value} onChange={value => setEditor({ ...activeEditor, value })}
-        onSubmit={() => activeEditor.mode === "edit" ? saveEdit(row, activeEditor.value) : createComment(activeEditor.value, root.id)}
+        onSubmit={() => activeEditor.mode === "edit" ? saveEdit(row, activeEditor.value) : createComment(activeEditor.value, root.id, row.id)}
         onCancel={() => setEditor(null)} action={activeEditor.mode === "edit" ? "Save comment" : "Send reply"}
         busy={busy} focus />}
       {deleting === row.id && <div className="comment-tools">

@@ -17,10 +17,18 @@ namespace FORA.Data
         public DbSet<PostBookmark> PostBookmarks => Set<PostBookmark>();
         public DbSet<PostPoll> PostPolls => Set<PostPoll>();
         public DbSet<PostPollVote> PostPollVotes => Set<PostPollVote>();
+        public DbSet<Notification> Notifications => Set<Notification>();
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             base.OnModelCreating(modelBuilder);
+            modelBuilder.Entity<Notification>().Property(n => n.Kind).HasMaxLength(16);
+            modelBuilder.Entity<Notification>().HasIndex(n => new { n.RecipientId, n.Id });
+            modelBuilder.Entity<Notification>().HasIndex(n => new { n.RecipientId, n.ReadAt });
+            modelBuilder.Entity<Notification>().HasOne(n => n.Actor).WithMany()
+                .HasForeignKey(n => n.ActorId).OnDelete(DeleteBehavior.NoAction);
+            modelBuilder.Entity<Notification>().HasOne<User>().WithMany()
+                .HasForeignKey(n => n.RecipientId).OnDelete(DeleteBehavior.NoAction);
             modelBuilder.Entity<PostPoll>().HasKey(p => p.PostId);
             modelBuilder.Entity<Post>().HasOne(p => p.Poll).WithOne()
                 .HasForeignKey<PostPoll>(p => p.PostId).OnDelete(DeleteBehavior.Cascade);

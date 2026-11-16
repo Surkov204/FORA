@@ -1,6 +1,7 @@
 # Social feed
 
 The active application is `BE/` + `FE/`. Sign-in now opens `/feed`.
+See [the handoff guide](HANDOFF.md) for the migration list and release verification.
 
 ## Features
 

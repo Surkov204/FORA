@@ -27,7 +27,8 @@ export default function PostCard({
       <div className="p-header">
         <Avatar className="avatar-tiny" src={post.userAvatar} alt="u" />
         <div className="p-info">
-          <span className="p-name">{post.userDisplayName || "User"}</span>
+          {post.userId ? <Link className="p-name member-link" to={"/members/" + post.userId}>{post.userDisplayName || "User"}</Link> :
+            <span className="p-name">{post.userDisplayName || "User"}</span>}
           <Link className="p-time" to={`/posts/${post.id}`} aria-label="Open post">
             {formatTime(post.createdAt)}
           </Link>

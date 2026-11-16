@@ -32,7 +32,7 @@ export default function Profile() {
     const [auth] = useState(session);
     const token = auth?.token;
     const userId = auth?.id;
-    const pollLive = useLivePolls(token);
+    const pollLive = useLivePolls();
 
     useEffect(() => {
         if (!auth) navigate("/auth", { replace: true });
@@ -451,9 +451,6 @@ export default function Profile() {
                     <Link className="menu-item active" to="/feed">
                         <i className="fa-solid fa-house"></i> Home
                     </Link>
-                    <a className="menu-item" href="#">
-                        <i className="fa-solid fa-bell"></i> Notifications
-                    </a>
                     <Link className="menu-item" to="/feed?tab=saved"><i className="fa-solid fa-bookmark"></i> Bookmarks</Link>
                     <a className="menu-item" href="#">
                         <i className="fa-solid fa-image"></i> Media

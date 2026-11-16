@@ -5,7 +5,7 @@ namespace FORA.Repositories;
 
 public interface ICommentRepository
 {
-    Task<Comment?> AddAsync(int postId, int userId, int? parentCommentId, string content);
+    Task<Comment?> AddAsync(int postId, int userId, int? parentCommentId, int? replyToCommentId, string content);
     Task<Comment?> FindAsync(int id);
     Task<bool> UpdateAsync(int id, int userId, string content);
     Task<bool> DeleteAsync(Comment comment);

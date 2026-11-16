@@ -1,66 +1,41 @@
-import { HttpTransportType, HubConnectionBuilder, LogLevel } from "@microsoft/signalr";
-import { useEffect, useState } from "react";
+import { createContext, useContext, useEffect, useState } from "react";
+import { subscribeToHub } from "./subscribeToHub";
 
 export function voteTotal(options) {
   return options.reduce((total, option) => total + option.voteCount, 0);
 }
 
-export function useLivePolls(token) {
+export const PollResultsContext = createContext(null);
+
+export function useLivePolls() {
+  return useContext(PollResultsContext);
+}
+
+export function useLiveCommunity(token) {
   const [results, setResults] = useState(() => new Map());
   const [connected, setConnected] = useState(false);
   const [connectionVersion, setConnectionVersion] = useState(0);
+  const [inboxVersion, setInboxVersion] = useState(0);
 
   useEffect(() => {
     if (!token) return;
-    let disposed = false;
-    let retry;
-    const connection = new HubConnectionBuilder()
-      .withUrl("/api/hubs/polls", { accessTokenFactory: () => token, transport: HttpTransportType.LongPolling })
-      .withAutomaticReconnect()
-      .configureLogging(LogLevel.None)
-      .build();
-
     const ready = () => {
-      if (disposed) return;
       setConnected(true);
       setConnectionVersion(version => version + 1);
+      setInboxVersion(version => version + 1);
     };
-    const retryStart = () => {
-      if (disposed) return;
-      clearTimeout(retry);
-      retry = setTimeout(start, 5000);
-    };
-    async function start() {
-      try {
-        await connection.start();
-        ready();
-      } catch {
-        retryStart();
-      }
-    }
-
-    connection.on("PollUpdated", result => {
-      if (disposed) return;
+    const updatePoll = result => {
       setResults(previous => {
         const current = previous.get(result.postId);
         if (current && voteTotal(current.options) >= voteTotal(result.options)) return previous;
         return new Map(previous).set(result.postId, result);
       });
-    });
-    connection.onreconnecting(() => { if (!disposed) setConnected(false); });
-    connection.onreconnected(ready);
-    connection.onclose(() => {
-      if (disposed) return;
-      setConnected(false);
-      retryStart();
-    });
-    void start();
-    return () => {
-      disposed = true;
-      clearTimeout(retry);
-      void connection.stop();
     };
+    return subscribeToHub("/api/hubs/polls", token, {
+      PollUpdated: updatePoll,
+      NotificationsChanged: () => setInboxVersion(version => version + 1),
+    }, ready, () => setConnected(false));
   }, [token]);
 
-  return { results, connected, connectionVersion };
+  return { pollResults: { results, connected, connectionVersion }, inboxVersion };
 }

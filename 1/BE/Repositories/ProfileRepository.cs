@@ -41,6 +41,7 @@ namespace FORA.Repositories
                 .Select(p => new ProfileUserPostDto
                 {
                     Id = p.Id,
+                    UserId = p.UserId,
                     Content = p.Content,
                     CreatedAt = p.CreatedAt,
                     LikeCount = p.LikeCount,

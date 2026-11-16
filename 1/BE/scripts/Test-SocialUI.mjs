@@ -243,7 +243,7 @@ try {
   await waitFor(() => desktop.evaluate('!!document.querySelector("' + reply + '")'), 'Older reply did not load');
   console.log('PASS: loaded additional root comments and replies separately');
 
-  const deepLink = await desktop.evaluate('document.querySelector("' + reply + ' a").href');
+  const deepLink = await desktop.evaluate("document.querySelector(" + JSON.stringify(reply + ' a[aria-label="Open comment link"]') + ").href");
   await desktop.command('Page.navigate', { url: deepLink });
   await waitFor(() => desktop.evaluate('document.activeElement.id === "comment-' + replyId + '" && document.activeElement.classList.contains("thread-highlight")'),
     'Direct link did not find, focus and highlight the older reply');
@@ -281,13 +281,84 @@ try {
     ' && document.activeElement.id === "comment-' + replyId + '"'), 'Login did not return to the shared reply');
   console.log('PASS: shared reply link returned to the exact comment after signing in');
 
+  await desktop.command('Page.bringToFront');
   await desktop.command('Page.navigate', { url: origin + '/profile' });
-  await waitFor(() => desktop.evaluate('!!document.querySelector(' + JSON.stringify(postSelector + ' .act-btn.comment') + ')'),
+  await waitFor(() => desktop.evaluate('location.pathname === "/profile" && !!document.querySelector(' + JSON.stringify(postSelector + ' .act-btn.comment') + ')'),
     'Discussion post did not appear in its author profile');
-  await desktop.evaluate('document.querySelector(' + JSON.stringify(postSelector + ' .act-btn.comment') + ').click()');
-  await waitFor(() => desktop.evaluate('document.querySelectorAll(' + JSON.stringify(postSelector + ' .thread-root') + ').length === 10'),
-    'Author profile did not use paged inline comments');
+  const profileCommentButton = JSON.stringify(postSelector + ' .act-btn.comment');
+  await desktop.evaluate('document.querySelector(' + profileCommentButton + ').click()');
+  try {
+    await waitFor(() => desktop.evaluate('document.querySelectorAll(' + JSON.stringify(postSelector + ' .thread-root') + ').length === 10'),
+      'Author profile did not use paged inline comments');
+  } catch (error) {
+    const details = await desktop.evaluate('({ path: location.pathname, expanded: document.querySelector(' + profileCommentButton +
+      ')?.getAttribute("aria-expanded"), discussion: document.querySelector(' + JSON.stringify(postSelector + ' .comment-thread') +
+      ')?.textContent.slice(0, 180) })');
+    throw new Error(error.message + ': ' + JSON.stringify(details));
+  }
   console.log('PASS: opened paged inline comments from the author profile');
+
+  for (const token of [tokenA, tokenB]) {
+    const response = await fetch(origin + '/api/notifications/read-all',
+      { method: 'PUT', headers: { Authorization: 'Bearer ' + token } });
+    if (!response.ok) throw new Error('Could not reset the fixture inbox');
+  }
+  const unread = count => 'document.querySelector(".notifications-trigger")?.getAttribute("aria-label") === ' +
+    JSON.stringify(count ? 'Notifications (' + count + ' unread)' : 'Notifications');
+  await waitFor(() => mobile.evaluate(unread(0)), 'Read-all did not clear the badge');
+
+  await desktop.command('Page.navigate', { url: origin + '/feed' });
+  await waitFor(() => desktop.evaluate('[...document.querySelectorAll(".person-info a")].some(link => link.textContent === "Lan")'),
+    'Lan was missing from Discover people');
+  await desktop.evaluate('[...document.querySelectorAll(".person-info a")].find(link => link.textContent === "Lan").click()');
+  await waitFor(() => desktop.evaluate('document.querySelector(".member-summary h1")?.textContent === "Lan"'), 'Member link did not open Lan’s profile');
+  await click(desktop, '.member-summary button', 'Follow');
+  await waitFor(() => desktop.evaluate('document.querySelector(".member-summary button")?.textContent === "Unfollow"'), 'Follow did not update the member profile');
+  await waitFor(() => mobile.evaluate(unread(1)), 'Recipient did not receive a live follow notification');
+  if (!await desktop.evaluate(unread(0))) throw new Error('The follower received a notification for their own action');
+  await mobile.evaluate('document.querySelector(".notifications-trigger").click()');
+  await waitFor(() => mobile.evaluate('document.querySelector(".notification-item")?.textContent.includes("Minh followed you")'), 'Follow notification missing');
+  await click(mobile, '.notification-item', 'Minh followed you');
+  await waitFor(() => mobile.evaluate('document.querySelector(".member-summary h1")?.textContent === "Minh" && ' + unread(0)),
+    'Reading the follow alert did not open the actor profile and clear the badge');
+  console.log('PASS: followed from a member profile and opened the follower from a private live notification');
+
+  await waitFor(() => mobile.evaluate('!!document.querySelector(' + JSON.stringify(postSelector + ' a[aria-label="Open post"]') + ')'),
+    'Member profile did not show the author’s post');
+  if (await mobile.evaluate('!!document.querySelector(' + JSON.stringify(postSelector + ' [aria-label="Edit post"]') + ')')) {
+    throw new Error('Another member’s profile offered post editing');
+  }
+  await mobile.evaluate('document.querySelector(' + JSON.stringify(postSelector + ' a[aria-label="Open post"]') + ').click()');
+  await waitFor(() => mobile.evaluate('!!document.querySelector(".thread-composer textarea")'), 'Could not open the post from the member profile');
+  await setValue(mobile, '.thread-composer textarea', 'I can take the first demo slot.');
+  await click(mobile, '.thread-composer button', 'Post comment');
+  await waitFor(() => desktop.evaluate(unread(1)), 'Post author did not receive the comment notification live');
+  await desktop.evaluate('document.querySelector(".notifications-trigger").click()');
+  await waitFor(() => desktop.evaluate('document.querySelector(".notification-item")?.textContent.includes("Lan commented on your post")'),
+    'Comment notification missing');
+  const inboxOutput = resolve('.qa', 'notification-ui');
+  await mkdir(inboxOutput, { recursive: true });
+  const inbox = await desktop.command('Page.captureScreenshot', { format: 'png' });
+  await writeFile(resolve(inboxOutput, 'desktop.png'), Buffer.from(inbox.data, 'base64'));
+  await click(desktop, '.notification-item', 'Lan commented on your post');
+  await waitFor(() => desktop.evaluate('document.activeElement.classList.contains("thread-highlight") && ' +
+    'document.activeElement.textContent.includes("I can take the first demo slot.") && ' + unread(0)),
+    'Reading the comment alert did not focus the exact comment');
+  console.log('PASS: comment notification arrived live and opened the exact comment as read');
+
+  const notifiedRoot = await desktop.evaluate('document.activeElement.id');
+  await click(desktop, '#' + notifiedRoot + ' .comment-tools button', 'Reply');
+  await setValue(desktop, '#' + notifiedRoot + ' textarea', 'Great, I will present the results.');
+  await click(desktop, '#' + notifiedRoot + ' form button', 'Send reply');
+  await waitFor(() => mobile.evaluate(unread(1)), 'Comment author did not receive the reply notification live');
+  await mobile.evaluate('document.querySelector(".notifications-trigger").click()');
+  await waitFor(() => mobile.evaluate('document.querySelector(".notification-item")?.textContent.includes("Minh replied to your comment")'),
+    'Reply notification missing');
+  await click(mobile, '.notification-item', 'Minh replied to your comment');
+  await waitFor(() => mobile.evaluate('document.activeElement.closest(".thread-replies") && ' +
+    'document.activeElement.textContent.includes("Great, I will present the results.") && ' + unread(0)),
+    'Reading the reply alert did not open the nested reply');
+  console.log('PASS: reply notification arrived live on mobile and highlighted the nested reply');
 } finally {
   socket?.close();
   browser.kill();

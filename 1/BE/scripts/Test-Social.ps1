@@ -107,6 +107,15 @@ try {
     $saved = Api GET "/social/feed?tab=saved&q=$marker"
     Assert (@($saved.items).Count -eq 0) 'Delete cascades saved post'
 
+    ExpectStatus 401 { Api GET '/notifications' -bearer '' }
+    $followInbox = Api GET '/notifications' -bearer $tokenB
+    $followAlert = @($followInbox.items | Where-Object kind -eq 'follow')
+    Assert ($followAlert.Count -eq 1 -and $followAlert[0].actorId -eq $ids[0] -and $followInbox.unread -eq 1) 'Repeated follow creates one private notification'
+    ExpectStatus 404 { Api PUT "/notifications/$($followAlert[0].id)/read" }
+    Api PUT "/notifications/$($followAlert[0].id)/read" -bearer $tokenB | Out-Null
+    Api PUT "/notifications/$($followAlert[0].id)/read" -bearer $tokenB | Out-Null
+    Assert ((Api GET '/notifications' -bearer $tokenB).unread -eq 0) 'Only the recipient can mark an individual notification as read'
+
     $badPoll = @{ options = @('Same', ' same '); durationHours = 24 }
     ExpectStatus 400 { Api POST '/posts' @{ content = "$marker invalid"; poll = $badPoll } }
     ExpectStatus 401 { Api POST '/hubs/polls/negotiate?negotiateVersion=1' -bearer '' }
@@ -146,6 +155,17 @@ try {
     $discussionId = $discussion.id
     $root = (Api POST '/comments' @{ postId = $discussionId; content = 'Original comment' }).comment
     $reply = (Api POST '/comments' @{ postId = $discussionId; parentCommentId = $root.id; content = 'Reply' } $tokenB).comment
+    $authorInbox = Api GET '/notifications'
+    $replyAlert = @($authorInbox.items | Where-Object commentId -eq $reply.id)
+    Assert ($replyAlert.Count -eq 1 -and $replyAlert[0].kind -eq 'reply' -and
+        $replyAlert[0].postId -eq $discussionId -and $replyAlert[0].actorId -eq $ids[1]) 'Reply notification deduplicates the post author and comment author'
+    $nestedReply = (Api POST '/comments' @{ postId = $discussionId; parentCommentId = $root.id; replyToCommentId = $reply.id; content = 'Direct response' }).comment
+    $directInbox = Api GET '/notifications' -bearer $tokenB
+    Assert ($nestedReply.parentCommentId -eq $root.id -and
+        @($directInbox.items | Where-Object { $_.commentId -eq $nestedReply.id -and $_.kind -eq 'reply' }).Count -eq 1) 'Replying to a reply notifies its author and stays one level deep'
+    Api DELETE "/comments/$($nestedReply.id)" | Out-Null
+    Api PUT '/notifications/read-all' | Out-Null
+    Assert ((Api GET '/notifications').unread -eq 0) 'Read-all clears the viewer unread count'
     ExpectStatus 400 { Api POST '/comments' @{ postId = $discussionId; parentCommentId = $reply.id; content = 'Too deep' } }
     ExpectStatus 403 { Api PUT "/comments/$($root.id)" @{ content = 'Not the author' } $tokenB }
     ExpectStatus 403 { Api DELETE "/comments/$($root.id)" $null $tokenB }
@@ -180,10 +200,15 @@ try {
     Assert (@($secondPage.value).Count -eq 1 -and
         $secondPage.value[0].Content -eq "$marker page 1" -and
         !$secondPage.'@odata.nextLink') 'OData continuation returns the remaining post'
+    $member = Api GET "/social/members/$($ids[1])/posts"
+    $nextMember = Api GET "/social/members/$($ids[1])/posts?beforeId=$($member.nextBeforeId)"
+    Assert ($member.items.Count -eq 10 -and $nextMember.items.Count -eq 10 -and
+        @($member.items + $nextMember.items | Where-Object userId -ne $ids[1]).Count -eq 0 -and
+        $nextMember.items[0].id -lt $member.items[-1].id) 'Member posts are filtered and paginated by author'
 } finally {
     if ($ids.Count) {
         $list = $ids -join ','
-        Sql "DELETE FROM PostBookmarks WHERE UserId IN ($list) OR PostId IN (SELECT Id FROM Posts WHERE UserId IN ($list)); DELETE FROM UserFollows WHERE FollowerId IN ($list) OR FollowingId IN ($list); DELETE FROM Comments WHERE UserId IN ($list) OR PostId IN (SELECT Id FROM Posts WHERE UserId IN ($list)); DELETE FROM PostLikes WHERE UserId IN ($list) OR PostId IN (SELECT Id FROM Posts WHERE UserId IN ($list)); DELETE FROM Posts WHERE UserId IN ($list); DELETE FROM UserProfiles WHERE UserId IN ($list); DELETE FROM Users WHERE Id IN ($list);" | Out-Null
+        Sql "DELETE FROM Notifications WHERE RecipientId IN ($list) OR ActorId IN ($list); DELETE FROM PostBookmarks WHERE UserId IN ($list) OR PostId IN (SELECT Id FROM Posts WHERE UserId IN ($list)); DELETE FROM UserFollows WHERE FollowerId IN ($list) OR FollowingId IN ($list); DELETE FROM Comments WHERE UserId IN ($list) OR PostId IN (SELECT Id FROM Posts WHERE UserId IN ($list)); DELETE FROM PostLikes WHERE UserId IN ($list) OR PostId IN (SELECT Id FROM Posts WHERE UserId IN ($list)); DELETE FROM Posts WHERE UserId IN ($list); DELETE FROM UserProfiles WHERE UserId IN ($list); DELETE FROM Users WHERE Id IN ($list);" | Out-Null
     }
     $connection.Dispose()
 }

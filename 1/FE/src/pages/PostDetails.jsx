@@ -34,7 +34,7 @@ function PostDetailsContent({ postId, targetCommentId, returnTo }) {
   const [busy, setBusy] = useState(false);
   const [retry, setRetry] = useState(0);
   const inProgress = useRef(false);
-  const pollLive = useLivePolls(auth?.token);
+  const pollLive = useLivePolls();
   const validId = /^\d+$/.test(postId) && Number(postId) > 0 && Number(postId) <= 2147483647;
 
   useEffect(() => {

@@ -4,6 +4,6 @@ using Microsoft.AspNetCore.SignalR;
 namespace FORA.Hubs;
 
 [Authorize]
-public sealed class PostPollHub : Hub
+public sealed class CommunityHub : Hub
 {
 }

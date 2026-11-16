@@ -3,6 +3,7 @@ using System.Security.Claims;
 using FORA.Data;
 using FORA.DTOs;
 using FORA.Models;
+using FORA.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -10,7 +11,7 @@ using Microsoft.EntityFrameworkCore;
 namespace FORA.Controllers;
 
 [ApiController, Authorize, Route("api/social")]
-public class SocialController(AppDbContext db) : ControllerBase
+public class SocialController(AppDbContext db, NotificationPublisher publisher) : ControllerBase
 {
     private int CurrentId => int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
 
@@ -36,6 +37,26 @@ public class SocialController(AppDbContext db) : ControllerBase
     {
         var post = await ProjectPosts(db.Posts.AsNoTracking().Where(p => p.Id == postId), CurrentId).SingleOrDefaultAsync();
         return post is null ? NotFound(new { message = "This post is no longer available." }) : Ok(post);
+    }
+
+    [HttpGet("members/{userId:int}/posts")]
+    public async Task<IActionResult> MemberPosts(int userId, int? beforeId)
+    {
+        if (userId <= 0 || beforeId is <= 0) return BadRequest();
+        if (!await db.UserProfiles.AnyAsync(profile => profile.UserId == userId)) return NotFound();
+        const int pageSize = 10;
+        var posts = db.Posts.AsNoTracking()
+            .Where(post => post.UserId == userId && (!beforeId.HasValue || post.Id < beforeId))
+            .OrderByDescending(post => post.Id).Take(pageSize + 1);
+        var items = await ProjectPosts(posts, CurrentId).ToListAsync();
+        int? nextBeforeId = null;
+        if (items.Count > pageSize)
+        {
+            items.RemoveAt(pageSize);
+            nextBeforeId = items[^1].Id;
+        }
+        var isFollowing = await db.UserFollows.AnyAsync(row => row.FollowerId == CurrentId && row.FollowingId == userId);
+        return Ok(new { items, nextBeforeId, isFollowing });
     }
 
     private IQueryable<SocialPostDto> ProjectPosts(IQueryable<Post> posts, int id)
@@ -83,12 +104,24 @@ public class SocialController(AppDbContext db) : ControllerBase
     {
         var id = CurrentId;
         if (id == userId) return BadRequest(new { message = "You cannot follow yourself." });
-        if (!await db.Users.AnyAsync(u => u.Id == userId)) return NotFound();
+        await using var transaction = await db.Database.BeginTransactionAsync();
+        // Serialize follow transitions targeting the same member to keep the notification in sync.
+        var target = await db.Users.FromSqlInterpolated($"SELECT * FROM [Users] WITH (UPDLOCK, HOLDLOCK) WHERE [Id] = {userId}")
+            .AsNoTracking().SingleOrDefaultAsync();
+        if (target is null) return NotFound();
         var follow = await db.UserFollows.FindAsync(id, userId);
-        if (request.Active && follow == null) db.UserFollows.Add(new() { FollowerId = id, FollowingId = userId });
+        var newFollow = request.Active && follow == null;
+        if (newFollow)
+        {
+            db.UserFollows.Add(new() { FollowerId = id, FollowingId = userId });
+            db.Notifications.Add(new Notification { RecipientId = userId, ActorId = id, Kind = Notification.Follow });
+        }
         if (!request.Active && follow != null) db.UserFollows.Remove(follow);
         await db.SaveChangesAsync();
-        return Ok(new { isFollowing = request.Active });
+        await transaction.CommitAsync();
+        if (newFollow) await publisher.PublishAsync([userId]);
+        var followerCount = await db.UserFollows.CountAsync(row => row.FollowingId == userId);
+        return Ok(new { isFollowing = request.Active, followerCount });
     }
 
     [HttpPut("bookmarks/{postId:int}")]

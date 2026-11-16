@@ -29,7 +29,7 @@ export default function Feed() {
   const sequence = useRef(0);
   const locks = useRef(new Set());
   const dialogRef = useRef(null);
-  const pollLive = useLivePolls(auth?.token);
+  const pollLive = useLivePolls();
 
   useEffect(() => {
     if (!editing && !deleting) return;
@@ -129,7 +129,10 @@ export default function Feed() {
         {people.length === 0 && <p className="social-muted">{query ? "No people found." : "More people will appear when they join FORA."}</p>}
         {people.map(person => <div className="person-row" key={person.userId}>
           <Avatar src={person.avatarUrl} className="avatar-tiny" alt="" />
-          <div className="person-info"><b>{person.displayName}</b><small>{person.followerCount} followers</small></div>
+          <div className="person-info">
+            <Link className="member-link" to={"/members/" + person.userId}><b>{person.displayName}</b></Link>
+            <small>{person.followerCount} followers</small>
+          </div>
           <button className={person.isFollowing ? "btn-secondary" : "btn-primary"} disabled={busy[`follow-${person.userId}`]} onClick={() => action(`follow-${person.userId}`, async () => {
             await request(`/social/follow/${person.userId}`, { method: "PUT", body: JSON.stringify({ active: !person.isFollowing }) });
             setPeople(old => old.map(p => p.userId === person.userId ? { ...p, isFollowing: !p.isFollowing, followerCount: p.followerCount + (p.isFollowing ? -1 : 1) } : p));

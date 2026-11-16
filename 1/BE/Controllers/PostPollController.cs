@@ -11,7 +11,7 @@ namespace FORA.Controllers;
 
 [ApiController, Authorize, Route("api/posts/{postId:int}/poll")]
 public sealed class PostPollController(
-    AppDbContext db, IHubContext<PostPollHub> hub, ILogger<PostPollController> logger) : ControllerBase
+    AppDbContext db, IHubContext<CommunityHub> hub, ILogger<PostPollController> logger) : ControllerBase
 {
     private int UserId => int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
 

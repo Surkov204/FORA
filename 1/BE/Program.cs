@@ -41,6 +41,7 @@ builder.Services.AddScoped<IProfileService, ProfileService>();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 builder.Services.AddSignalR();
+builder.Services.AddSingleton<NotificationPublisher>();
 
 // 🔹 ADD DB CONTEXT
 builder.Services.AddDbContext<AppDbContext>(options =>
@@ -122,7 +123,7 @@ app.UseCors("ForaClient");
 app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();
-app.MapHub<PostPollHub>("/api/hubs/polls", options =>
+app.MapHub<CommunityHub>("/api/hubs/polls", options =>
 {
     options.Transports = HttpTransportType.LongPolling;
     options.CloseOnAuthenticationExpiration = true;

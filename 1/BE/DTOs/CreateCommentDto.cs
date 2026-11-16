@@ -7,6 +7,7 @@ namespace FORA.DTOs
     {
         public int PostId { get; set; }
         public int? ParentCommentId { get; set; }
+        public int? ReplyToCommentId { get; set; }
         
         [Required(ErrorMessage = "Nội dung không được để trống")]
         [MaxLength(1000, ErrorMessage = "Nội dung không quá 1000 ký tự")]

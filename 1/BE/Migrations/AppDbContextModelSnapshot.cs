@@ -63,6 +63,48 @@ namespace FORA.Migrations
                     b.ToTable("Comments");
                 });
 
+            modelBuilder.Entity("FORA.Models.Notification", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
+
+                    b.Property<int>("ActorId")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("CommentId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("nvarchar(16)");
+
+                    b.Property<int?>("PostId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTimeOffset?>("ReadAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<int>("RecipientId")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ActorId");
+
+                    b.HasIndex("RecipientId", "Id");
+
+                    b.HasIndex("RecipientId", "ReadAt");
+
+                    b.ToTable("Notifications");
+                });
+
             modelBuilder.Entity("FORA.Models.Post", b =>
                 {
                     b.Property<int>("Id")
@@ -309,6 +351,23 @@ namespace FORA.Migrations
                     b.Navigation("Post");
 
                     b.Navigation("User");
+                });
+
+            modelBuilder.Entity("FORA.Models.Notification", b =>
+                {
+                    b.HasOne("FORA.Models.User", "Actor")
+                        .WithMany()
+                        .HasForeignKey("ActorId")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .IsRequired();
+
+                    b.HasOne("FORA.Models.User", null)
+                        .WithMany()
+                        .HasForeignKey("RecipientId")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .IsRequired();
+
+                    b.Navigation("Actor");
                 });
 
             modelBuilder.Entity("FORA.Models.Post", b =>
