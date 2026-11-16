@@ -25,7 +25,9 @@ namespace FORA.Repositories
                     Bio = p.Bio,
                     AvatarUrl = p.AvatarUrl,
                     CreatedAt = p.CreatedAt,
-                    PostCount = _db.Posts.Count(post => post.UserId == userId)
+                    PostCount = _db.Posts.Count(post => post.UserId == userId),
+                    FollowerCount = _db.UserFollows.Count(f => f.FollowingId == userId),
+                    FollowingCount = _db.UserFollows.Count(f => f.FollowerId == userId)
                 })
                 .FirstOrDefaultAsync();
         }
