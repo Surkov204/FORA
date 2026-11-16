@@ -10,6 +10,7 @@ function notificationText(item) {
     case "reply": return "replied to your comment";
     case "comment": return "commented on your post";
     case "follow": return "followed you";
+    case "answer-accepted": return "accepted your answer";
     default: return "sent an update";
   }
 }

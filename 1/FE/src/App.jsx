@@ -25,6 +25,7 @@ function App() {
       <Route path="/home" element={<Home />} />
       <Route element={<NotificationsLayout />}>
         <Route path="/feed" element={<Feed />} />
+        <Route path="/questions" element={<Feed key="questions" questionsOnly />} />
         <Route path="/profile" element={<Profile />} />
         <Route path="/posts/:postId" element={<PostDetails />} />
         <Route path="/members/:userId" element={<MemberProfile />} />

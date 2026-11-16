@@ -37,4 +37,7 @@
 .social-modal textarea { width:100%; min-height:150px; box-sizing:border-box; resize:vertical; border:1px solid var(--border); border-radius:12px; background:var(--bg-card); color:var(--text-main); padding:14px; font:inherit; }
 .social-modal-actions { display:flex; justify-content:flex-end; gap:12px; margin-top:20px; }
 .social-layout .p-content { white-space:pre-wrap; overflow-wrap:anywhere; }
+.question-filters { display:flex; flex-wrap:wrap; gap:12px; padding:12px; margin:8px 0; }
+.question-filters label { display:grid; gap:5px; font-size:14px; }
+.question-filters select { background:#171c23; color:#eef2f8; border:1px solid #465366; border-radius:8px; padding:7px 10px; font:inherit; }
 @media(max-width:760px) { .social-layout { flex-direction:column; padding:12px; gap:12px; } .social-layout .identity-col { display:contents; } .social-layout .content-col { width:100%; order:1; } .social-layout .profile-card { display:none; } .social-layout .menu-card { display:flex; flex-wrap:wrap; width:100%; order:0; } .social-layout .menu-item { flex:1; justify-content:center; padding:12px 8px; font-size:13px; } .social-layout .people-card { width:100%; order:2; max-height:280px; overflow:auto; } .social-search { flex-wrap:wrap; } .social-search input { min-width:100px; } }

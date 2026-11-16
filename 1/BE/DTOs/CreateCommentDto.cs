@@ -29,7 +29,7 @@ namespace FORA.DTOs
         public string? UserAvatarUrl { get; set; } // Để hiển thị avatar
     }
     public sealed record UpdateCommentDto([Required, MaxLength(1000)] string Content);
-    public sealed record CommentPageDto(List<CommentDto> Items, int? NextBeforeId, int Total);
-    public sealed record CommentMutationDto(CommentDto? Comment, CommentDto? Root, int Total);
+    public sealed record CommentPageDto(List<CommentDto> Items, int? NextBeforeId, int Total, CommentDto? AcceptedAnswer);
+    public sealed record CommentMutationDto(CommentDto? Comment, CommentDto? Root, int Total, int? AcceptedAnswerId);
     public sealed record CommentTargetDto(CommentDto Root, CommentDto Target);
 }

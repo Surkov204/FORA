@@ -1,0 +1,50 @@
+.post-reactions {
+  margin: 8px 0 0 52px;
+}
+
+.reaction-choices {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.reaction-choice {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  min-width: 42px;
+  min-height: 36px;
+  padding: 4px 9px;
+  border: 1px solid #353d47;
+  border-radius: 20px;
+  background: #161b21;
+  color: #e9f1fc;
+  font: inherit;
+  cursor: pointer;
+}
+
+.reaction-choice:not(:disabled):hover,
+.reaction-choice[aria-pressed="true"] {
+  border-color: #69b9fc;
+  background: #17314a;
+}
+
+.reaction-choice:focus-visible {
+  outline: 2px solid #81c7ff;
+  outline-offset: 2px;
+}
+
+.reaction-count {
+  font-size: .8rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.reaction-error {
+  color: #ffaccf;
+  font-size: .85rem;
+}
+
+@media (max-width: 480px) {
+  .post-reactions { margin-inline-start: 0; }
+}

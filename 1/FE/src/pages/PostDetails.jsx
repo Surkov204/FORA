@@ -79,8 +79,8 @@ function PostDetailsContent({ postId, targetCommentId, returnTo }) {
       <PostCard post={post} viewerId={auth.id} token={auth.token} pollLive={pollLive}
         openComments targetCommentId={targetCommentId} busy={busy}
         formatTime={value => new Date(value).toLocaleString()}
-        onCommentCountChange={commentCount => setPost(previous => ({ ...previous, commentCount }))}
-        onToggleLike={() => changePost(() => request(auth.token, "/likes/" + post.id, { method: "POST" }))}
+        onDiscussionChange={patch => setPost(previous => ({ ...previous, ...patch }))}
+        onReactionChange={patch => setPost(previous => ({ ...previous, ...patch }))}
         onBookmark={() => changePost(() => request(auth.token, "/social/bookmarks/" + post.id,
           { method: "PUT", body: { active: !post.isSaved } }))} />
     </div>}

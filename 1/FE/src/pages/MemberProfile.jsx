@@ -109,8 +109,8 @@ function MemberProfileContent({ userId, returnTo }) {
         {posts.length === 0 && <p className="member-summary">No posts yet.</p>}
         {posts.map(post => <PostCard key={post.id} post={post} viewerId={auth.id} token={auth.token}
           pollLive={live} busy={busy} formatTime={value => new Date(value).toLocaleString()}
-          onCommentCountChange={commentCount => patchPost(post.id, { commentCount })}
-          onToggleLike={() => act("/likes/" + post.id, { method: "POST" }, data => patchPost(post.id, data))}
+          onDiscussionChange={patch => patchPost(post.id, patch)}
+          onReactionChange={patch => patchPost(post.id, patch)}
           onBookmark={() => act("/social/bookmarks/" + post.id, { method: "PUT", body: { active: !post.isSaved } },
             data => patchPost(post.id, data))} />)}
       </section>

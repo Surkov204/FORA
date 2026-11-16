@@ -54,8 +54,15 @@ public sealed class CommentService(ICommentRepository repository) : ICommentServ
             comments.RemoveAt(PageSize);
             nextBeforeId = comments[^1].Id;
         }
+        CommentDto? acceptedAnswer = null;
+        if (parentCommentId == null && beforeId == null && await repository.GetAcceptedAnswerAsync(postId) is int answerId)
+        {
+            acceptedAnswer = comments.FirstOrDefault(comment => comment.Id == answerId)
+                ?? await repository.GetVisibleAsync(postId, answerId);
+            if (acceptedAnswer?.IsDeleted == true) acceptedAnswer = null;
+        }
         return ServiceResult.From(StatusCodes.Status200OK,
-            new CommentPageDto(comments, nextBeforeId, await repository.CountAsync(postId)));
+            new CommentPageDto(comments, nextBeforeId, await repository.CountAsync(postId), acceptedAnswer));
     }
 
     public async Task<ServiceResult> GetTargetAsync(int postId, int commentId)
@@ -73,7 +80,8 @@ public sealed class CommentService(ICommentRepository repository) : ICommentServ
         var root = comment.ParentCommentId is int parentId
             ? await repository.GetVisibleAsync(comment.PostId, parentId) : null;
         return ServiceResult.From(StatusCodes.Status200OK,
-            new CommentMutationDto(updated, root, await repository.CountAsync(comment.PostId)));
+            new CommentMutationDto(updated, root, await repository.CountAsync(comment.PostId),
+                await repository.GetAcceptedAnswerAsync(comment.PostId)));
     }
 
     private static ServiceResult InvalidContent() =>

@@ -3,15 +3,17 @@ import { Link } from "react-router-dom";
 import Avatar from "./Avatar";
 import CommentSection from "./CommentSection";
 import PostPoll from "./PostPoll";
+import PostReactions from "./PostReactions";
+import { questionTopics } from "../questionTopics";
 
 export default function PostCard({
   post,
   formatTime,
-  onToggleLike,
+  onReactionChange,
   viewerId,
   targetCommentId,
   openComments = false,
-  onCommentCountChange,
+  onDiscussionChange,
 
   currentUserAvatar,
   onDelete,
@@ -46,6 +48,12 @@ export default function PostCard({
         )}
       </div>
 
+      {post.questionTopic && <div className="question-labels">
+        <span>{questionTopics[post.questionTopic] || post.questionTopic}</span>
+        <span className={post.acceptedAnswerId ? "question-solved" : ""}>
+          {post.acceptedAnswerId ? "Solved" : "Unsolved"}
+        </span>
+      </div>}
       <div className="p-content">{post.content}</div>
       {post.poll && token && <PostPoll poll={post.poll} token={token} live={pollLive} />}
       {post.media && post.media.length > 0 && (
@@ -76,27 +84,19 @@ export default function PostCard({
 
         {onBookmark && <button className={`act-btn ${post.isSaved ? "saved" : ""}`} type="button" onClick={onBookmark} disabled={busy} aria-label={post.isSaved ? "Unsave post" : "Save post"} aria-pressed={!!post.isSaved}><i className={post.isSaved ? "fa-solid fa-bookmark" : "fa-regular fa-bookmark"} /></button>}
 
-        <button
-          className={`act-btn heart ${post.isLiked ? "liked" : ""}`}
-          type="button"
-          onClick={() => onToggleLike(post.id)}
-          disabled={busy}
-        >
-          <i
-            className={post.isLiked ? "fa-solid fa-heart" : "fa-regular fa-heart"}
-          ></i>
-          <span className="like-count">{post.likeCount || 0}</span>
-        </button>
-
       </div>
 
+      <PostReactions postId={post.id} token={token} summary={post.reactions} onChange={onReactionChange} />
       <CommentSection
         isOpen={commentsOpen}
         postId={post.id}
         token={token}
         viewerId={viewerId}
         targetCommentId={targetCommentId}
-        onCountChange={onCommentCountChange}
+        isQuestion={!!post.questionTopic}
+        acceptedAnswerId={post.acceptedAnswerId}
+        canAccept={viewerId === post.userId}
+        onDiscussionChange={onDiscussionChange}
         currentUserAvatar={currentUserAvatar}
         formatTime={formatTime}
       />

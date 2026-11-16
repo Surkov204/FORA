@@ -113,6 +113,9 @@ namespace FORA.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
 
+                    b.Property<int?>("AcceptedAnswerId")
+                        .HasColumnType("int");
+
                     b.Property<int>("CommentCount")
                         .HasColumnType("int");
 
@@ -126,12 +129,19 @@ namespace FORA.Migrations
                     b.Property<int>("LikeCount")
                         .HasColumnType("int");
 
+                    b.Property<string>("QuestionTopic")
+                        .HasMaxLength(24)
+                        .HasColumnType("nvarchar(24)");
+
                     b.Property<int>("UserId")
                         .HasColumnType("int");
 
                     b.HasKey("Id");
 
                     b.HasIndex("UserId");
+
+                    b.HasIndex("QuestionTopic", "Id")
+                        .HasFilter("[QuestionTopic] IS NOT NULL");
 
                     b.ToTable("Posts");
                 });
@@ -161,6 +171,13 @@ namespace FORA.Migrations
 
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime2");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(12)
+                        .HasColumnType("nvarchar(12)")
+                        .HasDefaultValue("like");
 
                     b.HasKey("UserId", "PostId");
 

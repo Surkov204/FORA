@@ -1,60 +1,27 @@
+using FORA.DTOs;
 using FORA.Models;
 using FORA.Repositories;
-using Microsoft.AspNetCore.Http;
 
-namespace FORA.Services
+namespace FORA.Services;
+
+public sealed class LikeService(ILikeRepository repository) : ILikeService
 {
-    public class LikeService : ILikeService
+    public Task<ServiceResult> ToggleLikeAsync(int? userId, int postId) =>
+        ChangeAsync(userId, postId, kind: null, toggleLike: true);
+
+    public Task<ServiceResult> SetReactionAsync(int? userId, int postId, string? kind) =>
+        ChangeAsync(userId, postId, kind, toggleLike: false);
+
+    private async Task<ServiceResult> ChangeAsync(int? userId, int postId, string? kind, bool toggleLike)
     {
-        private readonly ILikeRepository _likeRepository;
+        if (userId is null)
+            return ServiceResult.From(StatusCodes.Status401Unauthorized, new { message = "Unauthorized" });
+        if (kind is not (null or PostLike.Like or PostLike.Helpful or PostLike.Funny or PostLike.Celebrate))
+            return ServiceResult.From(StatusCodes.Status400BadRequest, new { message = "Select a supported reaction." });
 
-        public LikeService(ILikeRepository likeRepository)
-        {
-            _likeRepository = likeRepository;
-        }
-
-        public async Task<ServiceResult> ToggleLikeAsync(int? userId, int postId)
-        {
-            if (userId == null)
-            {
-                return ServiceResult.From(StatusCodes.Status401Unauthorized, new { message = "Unauthorized" });
-            }
-
-            var post = await _likeRepository.GetPostByIdAsync(postId);
-            if (post == null)
-            {
-                return ServiceResult.From(StatusCodes.Status404NotFound, new { message = "Post not found" });
-            }
-
-            var like = await _likeRepository.GetLikeAsync(postId, userId.Value);
-            bool isLiked;
-
-            if (like == null)
-            {
-                await _likeRepository.AddLikeAsync(new PostLike
-                {
-                    PostId = postId,
-                    UserId = userId.Value,
-                    CreatedAt = DateTime.UtcNow
-                });
-
-                post.LikeCount += 1;
-                isLiked = true;
-            }
-            else
-            {
-                _likeRepository.RemoveLike(like);
-                post.LikeCount = Math.Max(0, post.LikeCount - 1);
-                isLiked = false;
-            }
-
-            await _likeRepository.SaveChangesAsync();
-
-            return ServiceResult.From(StatusCodes.Status200OK, new
-            {
-                isLiked,
-                likeCount = post.LikeCount
-            });
-        }
+        var summary = await repository.ChangeReactionAsync(postId, userId.Value, kind, toggleLike);
+        return summary is null
+            ? ServiceResult.From(StatusCodes.Status404NotFound, new { message = "Post not found" })
+            : ServiceResult.From(StatusCodes.Status200OK, new ReactionResultDto(summary));
     }
 }

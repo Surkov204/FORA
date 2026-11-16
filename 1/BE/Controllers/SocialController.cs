@@ -16,15 +16,25 @@ public class SocialController(AppDbContext db, NotificationPublisher publisher) 
     private int CurrentId => int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
 
     [HttpGet("feed")]
-    public async Task<IActionResult> Feed(string? q, string tab = "latest", int page = 1, int pageSize = 10)
+    public async Task<IActionResult> Feed(string? q, string tab = "latest", int page = 1, int pageSize = 10,
+        string? topic = null, string? status = null)
     {
         if (page < 1 || page > 100000 || pageSize < 1 || pageSize > 50) return BadRequest(new { message = "Invalid pagination." });
-        if (!new[] { "latest", "following", "saved" }.Contains(tab)) return BadRequest();
+        if (tab is not ("latest" or "following" or "saved" or "questions")) return BadRequest();
+        if ((topic != null && !Post.IsQuestionTopic(topic)) || (status != null && status is not ("open" or "solved")))
+            return BadRequest(new { message = "Invalid question filters." });
         var id = CurrentId;
         var query = db.Posts.AsNoTracking().AsQueryable();
         if (!string.IsNullOrWhiteSpace(q)) query = query.Where(p => p.Content.Contains(q.Trim()) || p.User.Profile!.DisplayName.Contains(q.Trim()));
         if (tab == "following") query = query.Where(p => db.UserFollows.Any(f => f.FollowerId == id && f.FollowingId == p.UserId));
         if (tab == "saved") query = query.Where(p => db.PostBookmarks.Any(b => b.UserId == id && b.PostId == p.Id));
+        if (tab == "questions")
+        {
+            query = query.Where(p => p.QuestionTopic != null);
+            if (topic != null) query = query.Where(p => p.QuestionTopic == topic);
+            if (status == "open") query = query.Where(p => p.AcceptedAnswerId == null);
+            if (status == "solved") query = query.Where(p => p.AcceptedAnswerId != null);
+        }
         var total = await query.CountAsync();
         var pageQuery = query.OrderByDescending(p => p.CreatedAt).ThenByDescending(p => p.Id)
             .Skip((page - 1) * pageSize).Take(pageSize);
@@ -62,17 +72,19 @@ public class SocialController(AppDbContext db, NotificationPublisher publisher) 
     private IQueryable<SocialPostDto> ProjectPosts(IQueryable<Post> posts, int id)
     {
         var polls = PostPollQueries.ForViewer(db, id);
+        var reactions = PostReactionQueries.ForViewer(db, id);
         return posts.Select(p => new SocialPostDto
         {
             Id = p.Id,
+            QuestionTopic = p.QuestionTopic,
+            AcceptedAnswerId = p.AcceptedAnswerId,
             UserId = p.UserId,
             Content = p.Content,
             CreatedAt = p.CreatedAt,
-            LikeCount = db.PostLikes.Count(l => l.PostId == p.Id),
+            Reactions = reactions.Where(row => row.PostId == p.Id).Select(row => row.Summary).First(),
             CommentCount = db.Comments.Count(c => c.PostId == p.Id && c.DeletedAt == null),
             UserDisplayName = p.User.Profile != null ? p.User.Profile.DisplayName : "User",
             UserAvatar = p.User.Profile != null ? p.User.Profile.AvatarUrl : null,
-            IsLiked = db.PostLikes.Any(l => l.PostId == p.Id && l.UserId == id),
             IsSaved = db.PostBookmarks.Any(b => b.PostId == p.Id && b.UserId == id),
             Media = p.Media.OrderBy(m => m.Id).Select(m => new ProfileUserPostMediaDto { Url = m.Url, Type = m.Type }).ToList(),
             Poll = polls.FirstOrDefault(poll => poll.PostId == p.Id)

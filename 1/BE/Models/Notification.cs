@@ -15,4 +15,5 @@ public sealed class Notification
     public const string Reply = "reply";
     public const string Comment = "comment";
     public const string Follow = "follow";
+    public const string AnswerAccepted = "answer-accepted";
 }

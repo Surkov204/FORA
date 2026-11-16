@@ -359,6 +359,106 @@ try {
     'document.activeElement.textContent.includes("Great, I will present the results.") && ' + unread(0)),
     'Reading the reply alert did not open the nested reply');
   console.log('PASS: reply notification arrived live on mobile and highlighted the nested reply');
+
+  const questionText = 'How do I update the FORA database on a new machine?';
+  await desktop.command('Page.navigate', { url: origin + '/feed' });
+  await waitFor(() => desktop.evaluate('location.pathname === "/feed" && !!document.querySelector("a[href=\'/questions\']")'), 'Q&A link missing from the feed');
+  await desktop.evaluate('document.querySelector("a[href=\'/questions\']").click()');
+  await waitFor(() => desktop.evaluate('location.pathname === "/questions" && !!document.querySelector(".composer-card select")'), 'Question composer did not open');
+  await setValue(desktop, '.composer-card textarea', questionText);
+  await desktop.evaluate('(() => { const select = document.querySelector(".composer-card select"); select.value = "sql-server"; select.dispatchEvent(new Event("change", { bubbles: true })); })()');
+  await click(desktop, '.composer-card button', 'Post question');
+  const questionCard = '[...document.querySelectorAll(".post-card")].find(card => card.querySelector(".p-content")?.textContent === ' + JSON.stringify(questionText) + ')';
+  await waitFor(() => desktop.evaluate('(' + questionCard + ')?.querySelector(".question-labels")?.textContent === "SQL ServerUnsolved"'),
+    'Question did not appear under the selected topic as unsolved');
+  const questionId = Number(await desktop.evaluate('(' + questionCard + ').dataset.postId'));
+  console.log('PASS: posted an unsolved SQL Server question from the Q&A screen');
+
+  const answerText = 'Set the connection string and JWT key, then run dotnet ef database update.';
+  await mobile.command('Page.navigate', { url: origin + '/posts/' + questionId });
+  await waitFor(() => mobile.evaluate('location.pathname === "/posts/' + questionId + '" && !!document.querySelector(".thread-composer textarea")'),
+    'Question detail did not load on mobile');
+  await setValue(mobile, '.thread-composer textarea', answerText);
+  await click(mobile, '.thread-composer button', 'Post answer');
+  await waitFor(() => mobile.evaluate('document.querySelector(".thread-root .thread-text")?.textContent === ' + JSON.stringify(answerText)), 'Answer did not appear');
+  if (await mobile.evaluate('[...document.querySelectorAll(".thread-action")].some(button => button.textContent === "Accept answer")')) {
+    throw new Error('A non-owner could see the acceptance action');
+  }
+  const answerId = await mobile.evaluate('document.querySelector(".thread-root article").id');
+  await api(tokenA, '/comments', { postId: questionId, content: 'Remember to verify the database name first.' });
+  await waitFor(() => desktop.evaluate(unread(1)), 'Question author did not receive the new answer notification');
+  await desktop.evaluate('document.querySelector(".notifications-trigger").click()');
+  await waitFor(() => desktop.evaluate('document.querySelector(".notification-item")?.textContent.includes("Lan commented on your post")'), 'Answer notification missing');
+  await click(desktop, '.notification-item', 'Lan commented on your post');
+  await waitFor(() => desktop.evaluate('document.activeElement.id === ' + JSON.stringify(answerId)), 'Answer notification did not open the answer');
+  await click(desktop, '#' + answerId + ' .thread-action', 'Accept answer');
+  await waitFor(() => desktop.evaluate('document.querySelector(".thread-root article")?.id === ' + JSON.stringify(answerId) +
+    ' && !!document.querySelector(".thread-root .accepted-answer-label") && !!document.querySelector(".question-solved")'),
+    'The accepted answer was not pinned and the question was not marked solved');
+  console.log('PASS: question owner accepted an answer and pinned it above the newer answer');
+
+  await waitFor(() => mobile.evaluate(unread(1)), 'Answer author did not receive an acceptance notification');
+  await mobile.evaluate('document.querySelector(".notifications-trigger").click()');
+  await waitFor(() => mobile.evaluate('document.querySelector(".notification-item")?.textContent.includes("Minh accepted your answer")'), 'Acceptance notification missing');
+  await click(mobile, '.notification-item', 'Minh accepted your answer');
+  await waitFor(() => mobile.evaluate('document.activeElement.id === ' + JSON.stringify(answerId) +
+    ' && document.activeElement.classList.contains("accepted-answer") && ' + unread(0)),
+    'Acceptance notification did not open and highlight the accepted answer');
+
+  const questionOutput = resolve('.qa', 'question-ui');
+  await mkdir(questionOutput, { recursive: true });
+  if (await mobile.evaluate('document.documentElement.scrollWidth > innerWidth')) throw new Error('Question detail overflowed on mobile');
+  const solutionCapture = await mobile.command('Page.captureScreenshot', { format: 'png' });
+  await writeFile(resolve(questionOutput, 'accepted-answer-mobile.png'), Buffer.from(solutionCapture.data, 'base64'));
+  console.log('PASS: the acceptance notification arrived live and opened the pinned answer on mobile');
+
+  await desktop.command('Page.navigate', { url: origin + '/questions' });
+  await waitFor(() => desktop.evaluate('location.pathname === "/questions" && !!document.querySelector("[aria-label=\'Question filters\'] select")'), 'Question filters missing');
+  await desktop.evaluate('(() => { const [topic, status] = document.querySelectorAll("[aria-label=\'Question filters\'] select"); topic.value = "sql-server"; topic.dispatchEvent(new Event("change", { bubbles: true })); status.value = "solved"; status.dispatchEvent(new Event("change", { bubbles: true })); })()');
+  await waitFor(() => desktop.evaluate('document.querySelector(".feed-grid")?.getAttribute("aria-busy") === "false" && !!(' + questionCard + ')?.querySelector(".question-solved")'),
+    'The solved SQL Server question did not appear in the filters');
+  const boardCapture = await desktop.command('Page.captureScreenshot', { format: 'png' });
+  await writeFile(resolve(questionOutput, 'solved-questions-desktop.png'), Buffer.from(boardCapture.data, 'base64'));
+  await desktop.evaluate('(() => { const status = document.querySelectorAll("[aria-label=\'Question filters\'] select")[1]; status.value = "open"; status.dispatchEvent(new Event("change", { bubbles: true })); })()');
+  await waitFor(() => desktop.evaluate('document.querySelector(".feed-grid")?.getAttribute("aria-busy") === "false" && !(' + questionCard + ')'),
+    'The solved question was still in the unsolved filter');
+  console.log('PASS: topic, solved, and unsolved filters show the expected questions');
+
+  const reactionPost = await api(tokenA, '/posts', { content: 'The SQL Server setup guide is ready for the team.' });
+  const cardSelector = '[data-post-id="' + reactionPost.id + '"]';
+  const reactionSelector = kind => cardSelector + ' [data-reaction="' + kind + '"]';
+  const state = (kind, pressed, label) => '(() => { const button = document.querySelector(' +
+    JSON.stringify(reactionSelector(kind)) + '); return button?.getAttribute("aria-pressed") === ' +
+    JSON.stringify(String(pressed)) + ' && button.getAttribute("aria-label") === ' + JSON.stringify(label) + ' && !button.disabled; })()';
+  const press = (page, kind) => page.evaluate('document.querySelector(' + JSON.stringify(reactionSelector(kind)) + ').click()');
+
+  await desktop.command('Page.navigate', { url: origin + '/feed' });
+  await waitFor(() => desktop.evaluate('location.pathname === "/feed" && ' + state('helpful', false, 'Helpful (0)')), 'Feed reactions missing');
+  await press(desktop, 'helpful');
+  await waitFor(() => desktop.evaluate(state('helpful', true, 'Helpful (1)')), 'Helpful reaction was not applied');
+  await desktop.command('Page.reload');
+  await waitFor(() => desktop.evaluate(state('helpful', true, 'Helpful (1)')), 'The reaction did not persist on reload');
+  await press(desktop, 'funny');
+  await waitFor(() => desktop.evaluate(state('funny', true, 'Funny (1)') + ' && ' + state('helpful', false, 'Helpful (0)')),
+    'Switching reactions did not clear the old selection');
+  await press(desktop, 'funny');
+  await waitFor(() => desktop.evaluate(state('funny', false, 'Funny (0)')), 'Clicking the active reaction did not clear it');
+  await press(desktop, 'helpful');
+  await waitFor(() => desktop.evaluate(state('helpful', true, 'Helpful (1)')), 'Could not set Helpful again');
+  console.log('PASS: chose, changed and removed a reaction from the desktop feed, including reload persistence');
+
+  await mobile.command('Page.navigate', { url: origin + '/posts/' + reactionPost.id });
+  await waitFor(() => mobile.evaluate('location.pathname === "/posts/' + reactionPost.id + '" && ' + state('helpful', false, 'Helpful (1)')),
+    'Mobile detail did not show the other account’s Helpful reaction');
+  await press(mobile, 'celebrate');
+  await waitFor(() => mobile.evaluate(state('celebrate', true, 'Celebrate (1)') + ' && ' + state('helpful', false, 'Helpful (1)')),
+    'Mobile detail did not show both accounts’ reactions');
+  if (await mobile.evaluate('document.documentElement.scrollWidth > innerWidth')) throw new Error('The mobile reaction bar overflowed');
+  const reactionOutput = resolve('.qa', 'reaction-ui');
+  await mkdir(reactionOutput, { recursive: true });
+  const reactionCapture = await mobile.command('Page.captureScreenshot', { format: 'png' });
+  await writeFile(resolve(reactionOutput, 'mobile.png'), Buffer.from(reactionCapture.data, 'base64'));
+  console.log('PASS: mobile detail shows separate counts and highlights the current viewer’s reaction');
 } finally {
   socket?.close();
   browser.kill();

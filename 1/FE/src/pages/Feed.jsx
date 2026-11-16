@@ -4,10 +4,11 @@ import PostCard from "../Components/PostCard";
 import Avatar from "../Components/Avatar";
 import { useLivePolls } from "../hooks/useLivePolls";
 import { session } from "../session";
+import { questionTopics } from "../questionTopics";
 import "./profile.css";
 import "./feed.css";
 
-export default function Feed() {
+export default function Feed({ questionsOnly = false }) {
   const [auth] = useState(session);
   const [profile, setProfile] = useState(null);
   const [stats, setStats] = useState({ followerCount: 0, followingCount: 0 });
@@ -23,6 +24,10 @@ export default function Feed() {
   const [content, setContent] = useState("");
   const [pollOptions, setPollOptions] = useState(null);
   const [pollDuration, setPollDuration] = useState(24);
+  const [questionMode, setQuestionMode] = useState(false);
+  const [questionTopic, setQuestionTopic] = useState("general");
+  const [topicFilter, setTopicFilter] = useState("");
+  const [questionStatus, setQuestionStatus] = useState("");
   const [busy, setBusy] = useState({});
   const [editing, setEditing] = useState(null);
   const [deleting, setDeleting] = useState(null);
@@ -67,13 +72,16 @@ export default function Feed() {
     const version = ++sequence.current;
     setLoading(true); setError("");
     try {
-      const data = await request(`/social/feed?tab=${tab}&q=${encodeURIComponent(query)}&page=${nextPage}`);
+      const params = new URLSearchParams({ tab: questionsOnly ? "questions" : tab, q: query, page: nextPage });
+      if (questionsOnly && topicFilter) params.set("topic", topicFilter);
+      if (questionsOnly && questionStatus) params.set("status", questionStatus);
+      const data = await request("/social/feed?" + params);
       if (version !== sequence.current) return;
       setPosts(old => nextPage === 1 ? data.items : [...old, ...data.items.filter(p => !old.some(o => o.id === p.id))]);
       setPage(nextPage); setHasMore(data.hasMore);
     } catch (e) { if (version === sequence.current) setError(e.message); }
     finally { if (version === sequence.current) setLoading(false); }
-  }, [request, tab, query]);
+  }, [request, tab, query, questionsOnly, topicFilter, questionStatus]);
 
   useEffect(() => { if (auth) load(); return () => { sequence.current++; }; }, [auth, load]);
   useEffect(() => {
@@ -94,16 +102,19 @@ export default function Feed() {
   const update = (id, patch) => setPosts(old => old.map(p => p.id === id ? { ...p, ...patch } : p));
   const time = value => new Date(value).toLocaleString();
   const options = pollOptions?.map(option => option.trim());
+  const isQuestion = questionsOnly || questionMode;
   const validPoll = !options || (
     options.every(Boolean) && new Set(options.map(option => option.toLowerCase())).size === options.length
   );
   const submitPost = () => action("create", async () => {
     const post = { content: content.trim() };
     if (options) post.poll = { options, durationHours: pollDuration };
+    if (isQuestion) post.questionTopic = questionTopic;
     await request("/posts", { method: "POST", body: JSON.stringify(post) });
     setContent("");
     setPollOptions(null);
     setPollDuration(24);
+    setQuestionMode(false);
     await load();
   });
 
@@ -120,8 +131,11 @@ export default function Feed() {
         </div>
       </div>
       <nav className="dark-card menu-card" aria-label="Main navigation">
-        <button className={`menu-item menu-item-btn ${tab !== "saved" ? "active" : ""}`} onClick={() => setTab("latest")}><i className="fa-solid fa-house" /> Feed</button>
-        <button className={`menu-item menu-item-btn ${tab === "saved" ? "active" : ""}`} onClick={() => setTab("saved")}><i className="fa-regular fa-bookmark" /> Bookmarks</button>
+        {questionsOnly ? <Link className="menu-item" to="/feed">Feed</Link> : <>
+          <button className={`menu-item menu-item-btn ${tab !== "saved" ? "active" : ""}`} onClick={() => setTab("latest")}><i className="fa-solid fa-house" /> Feed</button>
+          <button className={`menu-item menu-item-btn ${tab === "saved" ? "active" : ""}`} onClick={() => setTab("saved")}><i className="fa-regular fa-bookmark" /> Bookmarks</button>
+        </>}
+        <Link className="menu-item" to="/questions" aria-current={questionsOnly ? "page" : undefined}>Q&amp;A</Link>
         <Link className="menu-item" to="/profile"><i className="fa-regular fa-user" /> My profile</Link>
         <button className="menu-item menu-item-btn menu-logout" onClick={() => { localStorage.removeItem("token"); localStorage.removeItem("currentUser"); window.location.assign("/auth"); }}><i className="fa-solid fa-right-from-bracket" /> Logout</button>
       </nav>
@@ -142,14 +156,14 @@ export default function Feed() {
       </section>
     </aside>
     <main className="content-col social-main">
-      <header className="social-heading"><div><span className="social-eyebrow">YOUR COMMUNITY</span><h1>{tab === "saved" ? "Bookmarks" : "Home feed"}</h1></div><button className="btn-secondary" disabled={loading} onClick={() => load()}>Refresh</button></header>
+      <header className="social-heading"><div><span className="social-eyebrow">YOUR COMMUNITY</span><h1>{questionsOnly ? "Q&A" : tab === "saved" ? "Bookmarks" : "Home feed"}</h1></div><button className="btn-secondary" disabled={loading} onClick={() => load()}>Refresh</button></header>
       <form className="social-search dark-card" onSubmit={e => { e.preventDefault(); setQuery(search.trim()); }}><i className="fa-solid fa-magnifying-glass" /><input aria-label="Search posts and people" placeholder="Search posts and people" value={search} maxLength={200} onChange={e => setSearch(e.target.value)} /><button className="btn-primary" type="submit">Search</button>{query && <button type="button" className="btn-secondary" onClick={() => { setSearch(""); setQuery(""); }}>Clear</button>}</form>
       {error && <div className="social-error" role="alert">{error}</div>}
       <section className="dark-card composer-card">
         <div className="composer-top">
           <Avatar src={profile?.avatarUrl} className="avatar-tiny" alt="" />
-          <textarea aria-label={pollOptions ? "Poll question" : "New post"}
-            placeholder={pollOptions ? "Ask your community a question…" : "What is happening?!"}
+          <textarea aria-label={isQuestion ? "Your question" : pollOptions ? "Poll question" : "New post"}
+            placeholder={isQuestion || pollOptions ? "Ask your community a question…" : "What is happening?!"}
             maxLength={5000} value={content} onChange={e => setContent(e.target.value)} />
         </div>
         {pollOptions && <fieldset className="poll-editor" disabled={busy.create}>
@@ -173,18 +187,44 @@ export default function Feed() {
           </label>
           {!validPoll && <small className="social-muted">Enter a different label for each option.</small>}
         </fieldset>}
+        {isQuestion && <div className="question-filters">
+          <label>Question topic
+            <select value={questionTopic} onChange={event => setQuestionTopic(event.target.value)} disabled={busy.create}>
+              {Object.entries(questionTopics).map(([id, name]) => <option key={id} value={id}>{name}</option>)}
+            </select>
+          </label>
+        </div>}
         <div className="composer-actions poll-controls">
-          <button type="button" className="btn-secondary" disabled={busy.create}
+          {!isQuestion && <button type="button" className="btn-secondary" disabled={busy.create}
             onClick={() => setPollOptions(previous => previous ? null : ["", ""])}>
             {pollOptions ? "Remove poll" : "Create poll"}
-          </button>
+          </button>}
+          {!questionsOnly && !pollOptions && <button type="button" className="btn-secondary" disabled={busy.create}
+            onClick={() => setQuestionMode(previous => !previous)}>
+            {questionMode ? "Remove question type" : "Ask a question"}
+          </button>}
           <span className="social-muted">{content.length}/5000</span>
           <button type="button" className="post-btn" disabled={!content.trim() || !validPoll || busy.create} onClick={submitPost}>
-            {busy.create ? "Posting…" : pollOptions ? "Post poll" : "Post"}
+            {busy.create ? "Posting…" : isQuestion ? "Post question" : pollOptions ? "Post poll" : "Post"}
           </button>
         </div>
       </section>
-      <div className="feed-filter social-tabs" role="tablist" aria-label="Feed filters">{[["latest", "Latest"], ["following", "Following"], ["saved", "Saved"]].map(([value, label]) => <button role="tab" aria-selected={tab === value} className={tab === value ? "active" : ""} key={value} onClick={() => setTab(value)}>{label}</button>)}</div>
+      {questionsOnly ? <section className="dark-card question-filters" aria-label="Question filters">
+        <label>Topic
+          <select value={topicFilter} onChange={event => setTopicFilter(event.target.value)}>
+            <option value="">All topics</option>
+            {Object.entries(questionTopics).map(([id, name]) => <option key={id} value={id}>{name}</option>)}
+          </select>
+        </label>
+        <label>Status
+          <select value={questionStatus} onChange={event => setQuestionStatus(event.target.value)}>
+            <option value="">All questions</option>
+            <option value="open">Unsolved</option>
+            <option value="solved">Solved</option>
+          </select>
+        </label>
+      </section> :
+        <div className="feed-filter social-tabs" role="tablist" aria-label="Feed filters">{[["latest", "Latest"], ["following", "Following"], ["saved", "Saved"]].map(([value, label]) => <button role="tab" aria-selected={tab === value} className={tab === value ? "active" : ""} key={value} onClick={() => setTab(value)}>{label}</button>)}</div>}
       {query && <p className="social-muted">Results for “{query}”</p>}
       <div className="feed-grid" aria-busy={loading}>
         {posts.map(post => <PostCard key={post.id} post={post} formatTime={time} currentUserAvatar={profile?.avatarUrl} busy={!!busy[`post-${post.id}`]}
@@ -192,9 +232,14 @@ export default function Feed() {
           onEdit={post.userId === auth.id && !post.poll ? () => setEditing({ id: post.id, content: post.content }) : undefined}
           onDelete={post.userId === auth.id ? () => setDeleting(post.id) : undefined}
           onBookmark={() => action(`post-${post.id}`, async () => { await request(`/social/bookmarks/${post.id}`, { method: "PUT", body: JSON.stringify({ active: !post.isSaved }) }); if (tab === "saved") await load(); else update(post.id, { isSaved: !post.isSaved }); })}
-          onToggleLike={id => action(`post-${id}`, async () => update(id, await request(`/likes/${id}`, { method: "POST" })))}
+          onReactionChange={patch => update(post.id, patch)}
           viewerId={auth.id}
-          onCommentCountChange={commentCount => update(post.id, { commentCount })}
+          onDiscussionChange={patch => {
+            if (questionsOnly && "acceptedAnswerId" in patch && questionStatus &&
+                Boolean(patch.acceptedAnswerId) !== (questionStatus === "solved")) {
+              setPosts(previous => previous.filter(item => item.id !== post.id));
+            } else update(post.id, patch);
+          }}
         />)}
       </div>
       {loading && <p className="social-empty" role="status">Loading posts…</p>}

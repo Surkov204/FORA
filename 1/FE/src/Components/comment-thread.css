@@ -133,3 +133,31 @@
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
+
+.question-labels {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 8px 0 8px 52px;
+}
+
+.question-labels span,
+.accepted-answer-label {
+  display: inline-block;
+  border-radius: 8px;
+  padding: 4px 8px;
+  background: #212939;
+  color: #dce7ff;
+  font-size: .8rem;
+  font-weight: 600;
+}
+
+.question-labels .question-solved,
+.accepted-answer-label {
+  background: #153730;
+  color: #baf5db;
+}
+
+.accepted-answer {
+  border-color: #4caa88;
+}

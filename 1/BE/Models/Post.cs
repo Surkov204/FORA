@@ -15,5 +15,9 @@ namespace FORA.Models
         public ICollection<Comment> Comments { get; set; } = new List<Comment>();
         public ICollection<PostMedia> Media { get; set; } = new List<PostMedia>();
         public PostPoll? Poll { get; set; }
+        public string? QuestionTopic { get; set; }
+        public int? AcceptedAnswerId { get; set; }
+
+        public static bool IsQuestionTopic(string topic) => topic is "sql-server" or "dotnet" or "react" or "general";
     }
 }

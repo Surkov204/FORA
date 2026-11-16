@@ -12,4 +12,5 @@ public interface ICommentRepository
     Task<CommentDto?> GetVisibleAsync(int postId, int id);
     Task<List<CommentDto>> GetPageAsync(int postId, int? parentCommentId, int? beforeId, int limit);
     Task<int> CountAsync(int postId);
+    Task<int?> GetAcceptedAnswerAsync(int postId);
 }

@@ -1,13 +1,8 @@
-using FORA.Models;
+using FORA.DTOs;
 
-namespace FORA.Repositories
+namespace FORA.Repositories;
+
+public interface ILikeRepository
 {
-    public interface ILikeRepository
-    {
-        Task<Post?> GetPostByIdAsync(int postId);
-        Task<PostLike?> GetLikeAsync(int postId, int userId);
-        Task AddLikeAsync(PostLike like);
-        void RemoveLike(PostLike like);
-        Task SaveChangesAsync();
-    }
+    Task<PostReactionsDto?> ChangeReactionAsync(int postId, int userId, string? kind, bool toggleLike);
 }

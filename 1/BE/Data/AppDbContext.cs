@@ -22,6 +22,9 @@ namespace FORA.Data
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             base.OnModelCreating(modelBuilder);
+            modelBuilder.Entity<Post>().Property(post => post.QuestionTopic).HasMaxLength(24);
+            modelBuilder.Entity<Post>().HasIndex(post => new { post.QuestionTopic, post.Id })
+                .HasFilter("[QuestionTopic] IS NOT NULL");
             modelBuilder.Entity<Notification>().Property(n => n.Kind).HasMaxLength(16);
             modelBuilder.Entity<Notification>().HasIndex(n => new { n.RecipientId, n.Id });
             modelBuilder.Entity<Notification>().HasIndex(n => new { n.RecipientId, n.ReadAt });
@@ -49,6 +52,9 @@ namespace FORA.Data
             modelBuilder.Entity<PostBookmark>().HasKey(x => new { x.UserId, x.PostId });
             modelBuilder.Entity<PostBookmark>().HasOne<User>().WithMany().HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.NoAction);
             modelBuilder.Entity<PostBookmark>().HasOne<Post>().WithMany().HasForeignKey(x => x.PostId).OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<PostLike>().Property(reaction => reaction.Kind)
+                .HasMaxLength(12).HasDefaultValue(PostLike.Like);
 
             // PostLike composite key
             modelBuilder.Entity<PostLike>()

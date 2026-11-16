@@ -21,6 +21,16 @@ namespace FORA.Services
                 return ServiceResult.From(StatusCodes.Status401Unauthorized, new { message = "Unauthorized" });
             }
 
+            var questionTopic = dto.QuestionTopic?.Trim().ToLowerInvariant();
+            if (questionTopic != null && (!Post.IsQuestionTopic(questionTopic) || dto.Poll != null
+                || string.IsNullOrWhiteSpace(dto.Content) || dto.Content.Length > 5000))
+            {
+                return ServiceResult.From(StatusCodes.Status400BadRequest, new
+                {
+                    message = "Provide a question and a supported topic. Polls use a separate post type."
+                });
+            }
+
             PostPoll? poll = null;
             if (dto.Poll is { } request)
             {
@@ -59,6 +69,7 @@ namespace FORA.Services
                 Content = dto.Content,
                 CreatedAt = DateTime.UtcNow,
                 Poll = poll,
+                QuestionTopic = questionTopic,
                 Media = cleanedMediaUrls.Select(url => new PostMedia
                 {
                     Url = url,

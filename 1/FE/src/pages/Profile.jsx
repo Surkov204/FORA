@@ -335,27 +335,6 @@ export default function Profile() {
         }
     };
 
-    // ===== like (giữ logic giống cũ, nhưng React update state) =====
-    const toggleLike = async (postId) => {
-        if (!token) return;
-
-        const res = await fetch(`${API}/likes/${postId}`, {
-            method: "POST",
-            headers: { Authorization: `Bearer ${token}` },
-        });
-
-        if (!res.ok) return;
-
-        const data = await res.json();
-        setPosts((prev) =>
-            prev.map((p) =>
-                p.id === postId
-                    ? { ...p, likeCount: data.likeCount, isLiked: data.isLiked }
-                    : p
-            )
-        );
-    };
-
     if (!profile) {
         return (
             <div style={{ padding: 20, color: "#fff" }}>
@@ -542,10 +521,11 @@ export default function Profile() {
                                 token={token}
                                 pollLive={pollLive}
                                 formatTime={formatTime}
-                                onToggleLike={toggleLike}
+                                onReactionChange={patch => setPosts(previous =>
+                                    previous.map(item => item.id === post.id ? { ...item, ...patch } : item))}
                                 viewerId={userId}
-                                onCommentCountChange={commentCount => setPosts(previous =>
-                                    previous.map(item => item.id === post.id ? { ...item, commentCount } : item))}
+                                onDiscussionChange={patch => setPosts(previous =>
+                                    previous.map(item => item.id === post.id ? { ...item, ...patch } : item))}
                                 currentUserAvatar={avatar}
                                 onDelete={() => requestDelete(post.id)}
                             />

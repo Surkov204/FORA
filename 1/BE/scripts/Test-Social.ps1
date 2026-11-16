@@ -205,6 +205,57 @@ try {
     Assert ($member.items.Count -eq 10 -and $nextMember.items.Count -eq 10 -and
         @($member.items + $nextMember.items | Where-Object userId -ne $ids[1]).Count -eq 0 -and
         $nextMember.items[0].id -lt $member.items[-1].id) 'Member posts are filtered and paginated by author'
+
+    ExpectStatus 400 { Api POST '/posts' @{ content = 'Unknown topic'; questionTopic = 'unknown' } }
+    ExpectStatus 400 { Api GET '/social/feed?tab=questions&status=unknown' }
+    $question = Api POST '/posts' @{ content = "$marker SQL question"; questionTopic = 'sql-server' }
+    $questionId = $question.id
+    $answerPath = "/questions/$questionId/accepted-answer"
+    $answer = (Api POST '/comments' @{ postId = $questionId; content = 'Run the EF migration.' } $tokenB).comment
+    $nested = (Api POST '/comments' @{ postId = $questionId; parentCommentId = $answer.id; content = 'From the repository root.' }).comment
+    ExpectStatus 401 { Api PUT $answerPath @{ commentId = $answer.id } '' }
+    ExpectStatus 403 { Api PUT $answerPath @{ commentId = $answer.id } $tokenB }
+    ExpectStatus 400 { Api PUT $answerPath @{ commentId = $nested.id } }
+    ExpectStatus 400 { Api PUT $answerPath @{ commentId = $reply.id } }
+    $openQuestions = Api GET "/social/feed?tab=questions&status=open&topic=sql-server&q=$marker"
+    Assert (@($openQuestions.items).Count -eq 1 -and $openQuestions.items[0].id -eq $questionId) 'Question topic and unsolved filter exclude ordinary posts'
+    foreach ($number in 1..10) {
+        Api POST '/comments' @{ postId = $questionId; content = "Later answer $number" } | Out-Null
+    }
+    Api PUT $answerPath @{ commentId = $answer.id } | Out-Null
+    Api PUT $answerPath @{ commentId = $answer.id } | Out-Null
+    $solved = Api GET "/social/feed?tab=questions&status=solved&topic=sql-server&q=$marker"
+    $pinned = Api GET "/comments/post/$questionId"
+    $answerInbox = Api GET '/notifications' -bearer $tokenB
+    Assert ($solved.items[0].acceptedAnswerId -eq $answer.id -and $pinned.acceptedAnswer.id -eq $answer.id -and
+        @($pinned.items | Where-Object id -eq $answer.id).Count -eq 0 -and
+        @($answerInbox.items | Where-Object { $_.kind -eq 'answer-accepted' -and $_.commentId -eq $answer.id }).Count -eq 1) 'Acceptance pins older answers and sends one private notification'
+    Api PUT $answerPath @{ commentId = $null } | Out-Null
+    Assert ($null -eq (Api GET "/social/posts/$questionId").acceptedAnswerId) 'Author can reopen a solved question'
+    Api PUT $answerPath @{ commentId = $answer.id } | Out-Null
+    $deletedAnswer = Api DELETE "/comments/$($answer.id)" $null $tokenB
+    ExpectStatus 400 { Api PUT $answerPath @{ commentId = $answer.id } }
+    Assert ($null -eq $deletedAnswer.acceptedAnswerId -and $null -eq (Api GET "/social/posts/$questionId").acceptedAnswerId) 'Deleting the accepted answer reopens the question'
+
+    $reactionPost = Api POST '/posts' @{ content = "$marker reaction rules" }
+    $reactionId = $reactionPost.id
+    $reactionPath = "/likes/$reactionId"
+    ExpectStatus 401 { Api PUT $reactionPath @{ kind = 'helpful' } '' }
+    ExpectStatus 400 { Api PUT $reactionPath @{ kind = 'unknown' } }
+    ExpectStatus 400 { Api PUT $reactionPath @{} }
+    $liked = Api POST $reactionPath
+    $helpful = Api PUT $reactionPath @{ kind = 'helpful' }
+    $same = Api PUT $reactionPath @{ kind = 'helpful' }
+    Assert ($liked.isLiked -and $liked.likeCount -eq 1 -and !$helpful.isLiked -and
+        $same.likeCount -eq 0 -and $same.reactions.helpful -eq 1 -and $same.reactions.myReaction -eq 'helpful') 'Legacy like and reaction switching update counts without duplicates'
+    $other = Api PUT $reactionPath @{ kind = 'celebrate' } $tokenB
+    $viewer = Api GET "/social/posts/$reactionId"
+    Assert ($other.reactions.helpful -eq 1 -and $viewer.reactions.celebrate -eq 1 -and
+        $viewer.reactions.myReaction -eq 'helpful') 'Reaction counts are shared and the selected reaction is viewer-specific'
+    $removed = Api PUT $reactionPath @{ kind = $null }
+    $last = Api PUT $reactionPath @{ kind = $null }
+    Assert ($null -eq $removed.reactions.myReaction -and $last.reactions.helpful -eq 0 -and
+        $last.reactions.celebrate -eq 1) 'Removing a reaction stays idempotent and preserves another user’s reaction'
 } finally {
     if ($ids.Count) {
         $list = $ids -join ','

@@ -6,11 +6,14 @@ namespace FORA.DTOs
         public int UserId { get; set; }
         public string Content { get; set; } = string.Empty;
         public DateTime CreatedAt { get; set; }
-        public int LikeCount { get; set; }
+        public PostReactionsDto Reactions { get; set; } = new();
+        public int LikeCount => Reactions.Like;
         public int CommentCount { get; set; }
         public string UserDisplayName { get; set; } = string.Empty;
         public string? UserAvatar { get; set; }
-        public bool IsLiked { get; set; }
+        public bool IsLiked => Reactions.MyReaction == Models.PostLike.Like;
+        public string? QuestionTopic { get; set; }
+        public int? AcceptedAnswerId { get; set; }
         public PostPollDto? Poll { get; set; }
         public List<ProfileUserPostMediaDto> Media { get; set; } = new();
     }

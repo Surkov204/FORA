@@ -17,7 +17,7 @@ public sealed class CommentRepository(AppDbContext db, NotificationPublisher pub
     {
         if (replyToCommentId.HasValue && !parentCommentId.HasValue) return null;
         await using var transaction = await db.Database.BeginTransactionAsync();
-        var post = await LockPostAsync(postId);
+        var post = await db.LockPostAsync(postId);
         if (post is null) return null;
         int? replyAuthor = null;
         if (parentCommentId.HasValue)
@@ -78,7 +78,7 @@ public sealed class CommentRepository(AppDbContext db, NotificationPublisher pub
     public async Task<bool> DeleteAsync(Comment comment)
     {
         await using var transaction = await db.Database.BeginTransactionAsync();
-        var post = await LockPostAsync(comment.PostId);
+        var post = await db.LockPostAsync(comment.PostId);
         if (post is null) return false;
 
         var deletedAt = DateTimeOffset.UtcNow;
@@ -89,6 +89,7 @@ public sealed class CommentRepository(AppDbContext db, NotificationPublisher pub
         if (deleted == 0) return false;
 
         post.CommentCount = Math.Max(0, post.CommentCount - 1);
+        if (post.AcceptedAnswerId == comment.Id) post.AcceptedAnswerId = null;
         await db.SaveChangesAsync();
         await transaction.CommitAsync();
         return true;
@@ -104,10 +105,8 @@ public sealed class CommentRepository(AppDbContext db, NotificationPublisher pub
 
     public Task<int> CountAsync(int postId) => Active.CountAsync(comment => comment.PostId == postId);
 
-    // Serialize comment creation and deletion for this post before validating a reply parent.
-    private Task<Post?> LockPostAsync(int postId) =>
-        db.Posts.FromSqlInterpolated($"SELECT * FROM [Posts] WITH (UPDLOCK, HOLDLOCK) WHERE [Id] = {postId}")
-            .SingleOrDefaultAsync();
+    public Task<int?> GetAcceptedAnswerAsync(int postId) => db.Posts.AsNoTracking()
+        .Where(post => post.Id == postId).Select(post => post.AcceptedAnswerId).SingleOrDefaultAsync();
 
     private static IQueryable<CommentDto> Project(IQueryable<Comment> comments) =>
         comments.Select(comment => new CommentDto

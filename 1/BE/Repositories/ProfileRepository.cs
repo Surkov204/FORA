@@ -35,20 +35,22 @@ namespace FORA.Repositories
         public Task<List<ProfileUserPostDto>> GetUserPostsAsync(int userId, int currentUserId)
         {
             var polls = PostPollQueries.ForViewer(_db, currentUserId);
+            var reactions = PostReactionQueries.ForViewer(_db, currentUserId);
             return _db.Posts
                 .Where(p => p.UserId == userId)
                 .OrderByDescending(p => p.CreatedAt)
                 .Select(p => new ProfileUserPostDto
                 {
                     Id = p.Id,
+                    QuestionTopic = p.QuestionTopic,
+                    AcceptedAnswerId = p.AcceptedAnswerId,
                     UserId = p.UserId,
                     Content = p.Content,
                     CreatedAt = p.CreatedAt,
-                    LikeCount = p.LikeCount,
+                    Reactions = reactions.Where(row => row.PostId == p.Id).Select(row => row.Summary).First(),
                     CommentCount = _db.Comments.Count(comment => comment.PostId == p.Id && comment.DeletedAt == null),
                     UserDisplayName = p.User.Profile != null ? p.User.Profile.DisplayName : "User",
                     UserAvatar = p.User.Profile != null ? p.User.Profile.AvatarUrl : null,
-                    IsLiked = _db.PostLikes.Any(l => l.PostId == p.Id && l.UserId == currentUserId),
                     Poll = polls.FirstOrDefault(poll => poll.PostId == p.Id),
                     Media = _db.PostMedia
                         .Where(m => m.PostId == p.Id)

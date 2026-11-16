@@ -32,7 +32,8 @@ function CommentForm({ label, value, onChange, onSubmit, onCancel, action, busy,
 }
 
 export default function CommentSection({
-  isOpen, postId, token, viewerId, targetCommentId, onCountChange, currentUserAvatar, formatTime,
+  isOpen, postId, token, viewerId, targetCommentId, isQuestion, acceptedAnswerId, canAccept,
+  onDiscussionChange, currentUserAvatar, formatTime,
 }) {
   const [page, setPage] = useState(null);
   const [replyPages, setReplyPages] = useState({});
@@ -49,7 +50,7 @@ export default function CommentSection({
   const highlighted = useRef(false);
   const targetElement = useRef(null);
   const endpoint = "/api/comments/post/" + postId;
-  const notifyCount = useEffectEvent(total => onCountChange?.(total));
+  const notifyDiscussion = useEffectEvent(patch => onDiscussionChange?.(patch));
 
   const request = useCallback(async (url, { method = "GET", body, signal } = {}) => {
     const headers = {};
@@ -77,8 +78,9 @@ export default function CommentSection({
     Promise.all([request(endpoint, options), targetRequest]).then(([first, target]) => {
       if (controller.signal.aborted) return;
       loaded.current = true;
-      setPage(target ? { ...first, items: mergeComments(first.items, [target.root]) } : first);
-      notifyCount(first.total);
+      const pinned = [target?.root, first.acceptedAnswer].filter(Boolean);
+      setPage({ ...first, items: mergeComments(first.items, pinned) });
+      notifyDiscussion({ commentCount: first.total, acceptedAnswerId: first.acceptedAnswer?.id ?? null });
       setFailedTarget(Boolean(targetCommentId && !target));
       if (target?.target.parentCommentId) {
         setExpanded({ [target.root.id]: true });
@@ -116,7 +118,7 @@ export default function CommentSection({
     return run(async () => {
       const next = await request(endpoint + "?beforeId=" + page.nextBeforeId);
       setPage(previous => ({ ...next, items: mergeComments(previous.items, next.items) }));
-      onCountChange?.(next.total);
+      onDiscussionChange?.({ commentCount: next.total });
     });
   }
 
@@ -128,7 +130,7 @@ export default function CommentSection({
       [rootId]: { ...next, loaded: true, items: mergeComments(previous[rootId]?.items || [], next.items) },
     }));
     setExpanded(previous => ({ ...previous, [rootId]: true }));
-    onCountChange?.(next.total);
+    onDiscussionChange?.({ commentCount: next.total });
   }
 
   function updateDiscussion(result, commentId, parentId) {
@@ -147,7 +149,7 @@ export default function CommentSection({
         },
       }));
     }
-    onCountChange?.(result.total);
+    onDiscussionChange?.({ commentCount: result.total, acceptedAnswerId: result.acceptedAnswerId });
   }
 
   function createComment(content, parentCommentId = null, replyToCommentId = null) {
@@ -179,12 +181,22 @@ export default function CommentSection({
     });
   }
 
+  function setAnswer(commentId) {
+    return run(async () => {
+      const result = await request("/api/questions/" + postId + "/accepted-answer", {
+        method: "PUT", body: { commentId },
+      });
+      onDiscussionChange?.({ acceptedAnswerId: result.acceptedAnswerId });
+    });
+  }
+
   function showComment(row, root) {
     const active = !row.isDeleted;
     const own = active && row.userId === viewerId;
     const targeted = row.id === targetCommentId;
+    const accepted = row.id === acceptedAnswerId;
     const activeEditor = editor?.id === row.id ? editor : null;
-    return <article id={"comment-" + row.id} className={"thread-comment" + (targeted ? " thread-highlight" : "")}
+    return <article id={"comment-" + row.id} className={"thread-comment" + (targeted ? " thread-highlight" : "") + (accepted ? " accepted-answer" : "")}
       key={row.id} tabIndex={targeted ? -1 : undefined} ref={targeted ? targetElement : undefined}>
       <div className="thread-comment-header">
         {active && <Avatar src={row.userAvatarUrl} className="c-avatar" alt="" />}
@@ -195,6 +207,7 @@ export default function CommentSection({
         </div>
       </div>
       <p className={active ? "thread-text" : "thread-meta"}>{active ? row.content : "Comment deleted"}</p>
+      {accepted && <span className="accepted-answer-label" role="status">✓ Accepted answer</span>}
       <div className="comment-tools">
         {active && !root.isDeleted && token && <button type="button" className="thread-action" disabled={busy}
           onClick={() => { setDeleting(null); setEditor({ id: row.id, mode: "reply", value: row.parentCommentId ? "@" + row.userDisplayName + " " : "" }); }}>
@@ -204,6 +217,10 @@ export default function CommentSection({
           onClick={() => { setDeleting(null); setEditor({ id: row.id, mode: "edit", value: row.content }); }}>Edit</button>}
         {own && <button type="button" className="thread-action" disabled={busy}
           onClick={() => { setEditor(null); setDeleting(row.id); }}>Delete</button>}
+        {isQuestion && canAccept && active && row.parentCommentId == null && <button type="button"
+          className="thread-action" disabled={busy} onClick={() => setAnswer(accepted ? null : row.id)}>
+          {accepted ? "Reopen question" : "Accept answer"}
+        </button>}
         <Link className="thread-action" to={"/posts/" + postId + "?comment=" + row.id} aria-label="Open comment link">Link</Link>
       </div>
       {activeEditor && <CommentForm
@@ -222,7 +239,7 @@ export default function CommentSection({
 
   if (!isOpen) return null;
   return <section className="comment-thread" aria-label="Discussion" aria-busy={busy}>
-    <h2>Discussion</h2>
+    <h2>{isQuestion ? "Answers" : "Discussion"}</h2>
     {error && <p className="social-error" role="alert">{error}</p>}
     {failedTarget && <p className="thread-meta" role="status">This comment is no longer available.</p>}
     {!page && (error
@@ -230,11 +247,11 @@ export default function CommentSection({
       : <p className="thread-meta" role="status">Loading comments…</p>)}
     {page && token && <div className="thread-composer">
       <Avatar src={currentUserAvatar} className="c-avatar" alt="" />
-      <CommentForm label="Write a comment" value={draft} onChange={setDraft}
-        onSubmit={() => createComment(draft)} action="Post comment" busy={busy} />
+      <CommentForm label={isQuestion ? "Write an answer" : "Write a comment"} value={draft} onChange={setDraft}
+        onSubmit={() => createComment(draft)} action={isQuestion ? "Post answer" : "Post comment"} busy={busy} />
     </div>}
-    {page?.items.length === 0 && <p className="thread-meta">No comments yet.</p>}
-    {page?.items.map(root => {
+    {page?.items.length === 0 && <p className="thread-meta">{isQuestion ? "No answers yet." : "No comments yet."}</p>}
+    {page?.items.toSorted((left, right) => Number(right.id === acceptedAnswerId) - Number(left.id === acceptedAnswerId)).map(root => {
       const replies = replyPages[root.id];
       const open = expanded[root.id];
       return <div key={root.id} className="thread-root">
