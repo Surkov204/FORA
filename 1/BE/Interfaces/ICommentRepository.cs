@@ -1,13 +1,15 @@
 using FORA.DTOs;
 using FORA.Models;
 
-namespace FORA.Repositories
+namespace FORA.Repositories;
+
+public interface ICommentRepository
 {
-    public interface ICommentRepository
-    {
-        Task<Post?> GetPostByIdAsync(int postId);
-        Task<Comment> AddCommentWithPostCountAsync(Post post, int userId, string content);
-        Task<UserProfile?> GetUserProfileByUserIdAsync(int userId);
-        Task<List<CommentDto>> GetCommentsByPostIdAsync(int postId);
-    }
+    Task<Comment?> AddAsync(int postId, int userId, int? parentCommentId, string content);
+    Task<Comment?> FindAsync(int id);
+    Task<bool> UpdateAsync(int id, int userId, string content);
+    Task<bool> DeleteAsync(Comment comment);
+    Task<CommentDto?> GetVisibleAsync(int postId, int id);
+    Task<List<CommentDto>> GetPageAsync(int postId, int? parentCommentId, int? beforeId, int limit);
+    Task<int> CountAsync(int postId);
 }

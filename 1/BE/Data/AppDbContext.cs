@@ -15,10 +15,26 @@ namespace FORA.Data
         public DbSet<PostMedia> PostMedia => Set<PostMedia>();
         public DbSet<UserFollow> UserFollows => Set<UserFollow>();
         public DbSet<PostBookmark> PostBookmarks => Set<PostBookmark>();
+        public DbSet<PostPoll> PostPolls => Set<PostPoll>();
+        public DbSet<PostPollVote> PostPollVotes => Set<PostPollVote>();
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             base.OnModelCreating(modelBuilder);
+            modelBuilder.Entity<PostPoll>().HasKey(p => p.PostId);
+            modelBuilder.Entity<Post>().HasOne(p => p.Poll).WithOne()
+                .HasForeignKey<PostPoll>(p => p.PostId).OnDelete(DeleteBehavior.Cascade);
+            modelBuilder.Entity<PostPoll>().HasMany(p => p.Options).WithOne()
+                .HasForeignKey(o => o.PostId).OnDelete(DeleteBehavior.Cascade);
+            modelBuilder.Entity<PostPollOption>().ToTable("PostPollOptions");
+            modelBuilder.Entity<PostPollOption>().HasKey(o => new { o.PostId, o.Number });
+            modelBuilder.Entity<PostPollOption>().Property(o => o.Text).HasMaxLength(80);
+            modelBuilder.Entity<PostPollOption>().HasMany(o => o.Votes).WithOne()
+                .HasForeignKey(v => new { v.PostId, v.OptionNumber }).OnDelete(DeleteBehavior.Cascade);
+            modelBuilder.Entity<PostPollVote>().HasKey(v => new { v.PostId, v.UserId });
+            modelBuilder.Entity<PostPollVote>().HasOne<User>().WithMany()
+                .HasForeignKey(v => v.UserId).OnDelete(DeleteBehavior.NoAction);
+
             modelBuilder.Entity<UserFollow>().HasKey(x => new { x.FollowerId, x.FollowingId });
             modelBuilder.Entity<UserFollow>().HasOne<User>().WithMany().HasForeignKey(x => x.FollowerId).OnDelete(DeleteBehavior.NoAction);
             modelBuilder.Entity<UserFollow>().HasOne<User>().WithMany().HasForeignKey(x => x.FollowingId).OnDelete(DeleteBehavior.NoAction);
@@ -65,6 +81,10 @@ namespace FORA.Data
                 .WithMany(p => p.Comments)
                 .HasForeignKey(c => c.PostId)
                 .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<Comment>().HasMany(c => c.Replies).WithOne()
+                .HasForeignKey(c => c.ParentCommentId).OnDelete(DeleteBehavior.NoAction);
+            modelBuilder.Entity<Comment>().HasIndex(c => new { c.PostId, c.ParentCommentId, c.Id });
 
             // PostMedia - Post (CASCADE)
             modelBuilder.Entity<PostMedia>()

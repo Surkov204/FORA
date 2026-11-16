@@ -2,18 +2,10 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, Navigate } from "react-router-dom";
 import PostCard from "../Components/PostCard";
 import Avatar from "../Components/Avatar";
+import { useLivePolls } from "../hooks/useLivePolls";
+import { session } from "../session";
 import "./profile.css";
 import "./feed.css";
-
-function session() {
-  try {
-    const token = localStorage.getItem("token");
-    const payload = JSON.parse(atob(token.split(".")[1].replace(/-/g, "+").replace(/_/g, "/")));
-    if (payload.exp * 1000 <= Date.now()) return null;
-    const id = Number(payload["http://schemas.xmlsoap.org/ws/2005/05/identity/claims/nameidentifier"] || payload.sub);
-    return Number.isInteger(id) && id > 0 ? { token, id } : null;
-  } catch { return null; }
-}
 
 export default function Feed() {
   const [auth] = useState(session);
@@ -29,15 +21,15 @@ export default function Feed() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [content, setContent] = useState("");
+  const [pollOptions, setPollOptions] = useState(null);
+  const [pollDuration, setPollDuration] = useState(24);
   const [busy, setBusy] = useState({});
   const [editing, setEditing] = useState(null);
   const [deleting, setDeleting] = useState(null);
-  const [comments, setComments] = useState({});
-  const [open, setOpen] = useState({});
-  const [drafts, setDrafts] = useState({});
   const sequence = useRef(0);
   const locks = useRef(new Set());
   const dialogRef = useRef(null);
+  const pollLive = useLivePolls(auth?.token);
 
   useEffect(() => {
     if (!editing && !deleting) return;
@@ -101,11 +93,19 @@ export default function Feed() {
   if (!auth) return <Navigate to="/auth" replace />;
   const update = (id, patch) => setPosts(old => old.map(p => p.id === id ? { ...p, ...patch } : p));
   const time = value => new Date(value).toLocaleString();
-  const getComments = async id => {
-    const data = await request(`/comments/post/${id}`);
-    setComments(old => ({ ...old, [id]: data }));
-    return data;
-  };
+  const options = pollOptions?.map(option => option.trim());
+  const validPoll = !options || (
+    options.every(Boolean) && new Set(options.map(option => option.toLowerCase())).size === options.length
+  );
+  const submitPost = () => action("create", async () => {
+    const post = { content: content.trim() };
+    if (options) post.poll = { options, durationHours: pollDuration };
+    await request("/posts", { method: "POST", body: JSON.stringify(post) });
+    setContent("");
+    setPollOptions(null);
+    setPollDuration(24);
+    await load();
+  });
 
   return <div className="app-layout social-layout">
     <aside className="identity-col">
@@ -142,19 +142,56 @@ export default function Feed() {
       <header className="social-heading"><div><span className="social-eyebrow">YOUR COMMUNITY</span><h1>{tab === "saved" ? "Bookmarks" : "Home feed"}</h1></div><button className="btn-secondary" disabled={loading} onClick={() => load()}>Refresh</button></header>
       <form className="social-search dark-card" onSubmit={e => { e.preventDefault(); setQuery(search.trim()); }}><i className="fa-solid fa-magnifying-glass" /><input aria-label="Search posts and people" placeholder="Search posts and people" value={search} maxLength={200} onChange={e => setSearch(e.target.value)} /><button className="btn-primary" type="submit">Search</button>{query && <button type="button" className="btn-secondary" onClick={() => { setSearch(""); setQuery(""); }}>Clear</button>}</form>
       {error && <div className="social-error" role="alert">{error}</div>}
-      <section className="dark-card composer-card"><div className="composer-top"><Avatar src={profile?.avatarUrl} className="avatar-tiny" alt="" /><textarea aria-label="New post" placeholder="What is happening?!" maxLength={5000} value={content} onChange={e => setContent(e.target.value)} /></div><div className="composer-actions"><span className="social-muted">{content.length}/5000</span><button className="post-btn" disabled={!content.trim() || busy.create} onClick={() => action("create", async () => { await request("/posts", { method: "POST", body: JSON.stringify({ content: content.trim() }) }); setContent(""); await load(); })}>{busy.create ? "Posting…" : "Post"}</button></div></section>
+      <section className="dark-card composer-card">
+        <div className="composer-top">
+          <Avatar src={profile?.avatarUrl} className="avatar-tiny" alt="" />
+          <textarea aria-label={pollOptions ? "Poll question" : "New post"}
+            placeholder={pollOptions ? "Ask your community a question…" : "What is happening?!"}
+            maxLength={5000} value={content} onChange={e => setContent(e.target.value)} />
+        </div>
+        {pollOptions && <fieldset className="poll-editor" disabled={busy.create}>
+          <legend>Poll choices</legend>
+          {pollOptions.map((option, index) => <label key={index}>
+            Option {index + 1}
+            <input value={option} maxLength={80}
+              onChange={e => setPollOptions(previous => previous.map((text, position) => position === index ? e.target.value : text))} />
+          </label>)}
+          <div className="poll-controls">
+            {pollOptions.length < 4 && <button type="button" className="btn-secondary" onClick={() => setPollOptions(previous => [...previous, ""])}>Add option</button>}
+            {pollOptions.length > 2 && <button type="button" className="btn-secondary" onClick={() => setPollOptions(previous => previous.slice(0, -1))}>Remove last option</button>}
+          </div>
+          <label>Voting closes in
+            <select value={pollDuration} onChange={e => setPollDuration(Number(e.target.value))}>
+              <option value={1}>1 hour</option>
+              <option value={24}>1 day</option>
+              <option value={72}>3 days</option>
+              <option value={168}>7 days</option>
+            </select>
+          </label>
+          {!validPoll && <small className="social-muted">Enter a different label for each option.</small>}
+        </fieldset>}
+        <div className="composer-actions poll-controls">
+          <button type="button" className="btn-secondary" disabled={busy.create}
+            onClick={() => setPollOptions(previous => previous ? null : ["", ""])}>
+            {pollOptions ? "Remove poll" : "Create poll"}
+          </button>
+          <span className="social-muted">{content.length}/5000</span>
+          <button type="button" className="post-btn" disabled={!content.trim() || !validPoll || busy.create} onClick={submitPost}>
+            {busy.create ? "Posting…" : pollOptions ? "Post poll" : "Post"}
+          </button>
+        </div>
+      </section>
       <div className="feed-filter social-tabs" role="tablist" aria-label="Feed filters">{[["latest", "Latest"], ["following", "Following"], ["saved", "Saved"]].map(([value, label]) => <button role="tab" aria-selected={tab === value} className={tab === value ? "active" : ""} key={value} onClick={() => setTab(value)}>{label}</button>)}</div>
       {query && <p className="social-muted">Results for “{query}”</p>}
       <div className="feed-grid" aria-busy={loading}>
         {posts.map(post => <PostCard key={post.id} post={post} formatTime={time} currentUserAvatar={profile?.avatarUrl} busy={!!busy[`post-${post.id}`]}
-          onEdit={post.userId === auth.id ? () => setEditing({ id: post.id, content: post.content }) : undefined}
+          token={auth.token} pollLive={pollLive}
+          onEdit={post.userId === auth.id && !post.poll ? () => setEditing({ id: post.id, content: post.content }) : undefined}
           onDelete={post.userId === auth.id ? () => setDeleting(post.id) : undefined}
           onBookmark={() => action(`post-${post.id}`, async () => { await request(`/social/bookmarks/${post.id}`, { method: "PUT", body: JSON.stringify({ active: !post.isSaved }) }); if (tab === "saved") await load(); else update(post.id, { isSaved: !post.isSaved }); })}
           onToggleLike={id => action(`post-${id}`, async () => update(id, await request(`/likes/${id}`, { method: "POST" })))}
-          commentsOpen={!!open[post.id]} comments={comments[post.id] || []} commentInputValue={drafts[post.id] || ""}
-          onToggleComments={id => action(`comments-${id}`, async () => { if (!open[id]) await getComments(id); setOpen(old => ({ ...old, [id]: !old[id] })); })}
-          onCommentInputChange={value => setDrafts(old => ({ ...old, [post.id]: value }))}
-          onSubmitComment={() => action(`comment-${post.id}`, async () => { const text = drafts[post.id]?.trim(); if (!text) return; await request("/comments", { method: "POST", body: JSON.stringify({ postId: post.id, content: text }) }); setDrafts(old => ({ ...old, [post.id]: "" })); const list = await getComments(post.id); update(post.id, { commentCount: list.length }); })}
+          viewerId={auth.id}
+          onCommentCountChange={commentCount => update(post.id, { commentCount })}
         />)}
       </div>
       {loading && <p className="social-empty" role="status">Loading posts…</p>}

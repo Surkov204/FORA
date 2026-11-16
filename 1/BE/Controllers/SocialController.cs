@@ -1,6 +1,7 @@
 using System.ComponentModel.DataAnnotations;
 using System.Security.Claims;
 using FORA.Data;
+using FORA.DTOs;
 using FORA.Models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -24,18 +25,37 @@ public class SocialController(AppDbContext db) : ControllerBase
         if (tab == "following") query = query.Where(p => db.UserFollows.Any(f => f.FollowerId == id && f.FollowingId == p.UserId));
         if (tab == "saved") query = query.Where(p => db.PostBookmarks.Any(b => b.UserId == id && b.PostId == p.Id));
         var total = await query.CountAsync();
-        var items = await query.OrderByDescending(p => p.CreatedAt).ThenByDescending(p => p.Id)
-            .Skip((page - 1) * pageSize).Take(pageSize).Select(p => new {
-                p.Id, p.UserId, p.Content, p.CreatedAt,
-                LikeCount = db.PostLikes.Count(l => l.PostId == p.Id),
-                CommentCount = db.Comments.Count(c => c.PostId == p.Id),
-                UserDisplayName = p.User.Profile != null ? p.User.Profile.DisplayName : "User",
-                UserAvatar = p.User.Profile != null ? p.User.Profile.AvatarUrl : null,
-                IsLiked = db.PostLikes.Any(l => l.PostId == p.Id && l.UserId == id),
-                IsSaved = db.PostBookmarks.Any(b => b.PostId == p.Id && b.UserId == id),
-                Media = p.Media.OrderBy(m => m.Id).Select(m => new { m.Url, m.Type }).ToList()
-            }).ToListAsync();
+        var pageQuery = query.OrderByDescending(p => p.CreatedAt).ThenByDescending(p => p.Id)
+            .Skip((page - 1) * pageSize).Take(pageSize);
+        var items = await ProjectPosts(pageQuery, id).ToListAsync();
         return Ok(new { items, total, hasMore = (long)page * pageSize < total });
+    }
+
+    [HttpGet("posts/{postId:int}")]
+    public async Task<IActionResult> PostDetails(int postId)
+    {
+        var post = await ProjectPosts(db.Posts.AsNoTracking().Where(p => p.Id == postId), CurrentId).SingleOrDefaultAsync();
+        return post is null ? NotFound(new { message = "This post is no longer available." }) : Ok(post);
+    }
+
+    private IQueryable<SocialPostDto> ProjectPosts(IQueryable<Post> posts, int id)
+    {
+        var polls = PostPollQueries.ForViewer(db, id);
+        return posts.Select(p => new SocialPostDto
+        {
+            Id = p.Id,
+            UserId = p.UserId,
+            Content = p.Content,
+            CreatedAt = p.CreatedAt,
+            LikeCount = db.PostLikes.Count(l => l.PostId == p.Id),
+            CommentCount = db.Comments.Count(c => c.PostId == p.Id && c.DeletedAt == null),
+            UserDisplayName = p.User.Profile != null ? p.User.Profile.DisplayName : "User",
+            UserAvatar = p.User.Profile != null ? p.User.Profile.AvatarUrl : null,
+            IsLiked = db.PostLikes.Any(l => l.PostId == p.Id && l.UserId == id),
+            IsSaved = db.PostBookmarks.Any(b => b.PostId == p.Id && b.UserId == id),
+            Media = p.Media.OrderBy(m => m.Id).Select(m => new ProfileUserPostMediaDto { Url = m.Url, Type = m.Type }).ToList(),
+            Poll = polls.FirstOrDefault(poll => poll.PostId == p.Id)
+        });
     }
 
     [HttpGet("people")]
@@ -86,9 +106,10 @@ public class SocialController(AppDbContext db) : ControllerBase
     public async Task<IActionResult> Edit(int postId, EditPostRequest request)
     {
         if (string.IsNullOrWhiteSpace(request.Content)) return BadRequest(new { message = "Post content is required." });
-        var post = await db.Posts.FindAsync(postId);
+        var post = await db.Posts.Include(p => p.Poll).FirstOrDefaultAsync(p => p.Id == postId);
         if (post == null) return NotFound();
         if (post.UserId != CurrentId) return Forbid();
+        if (post.Poll != null) return Conflict(new { message = "Published poll questions cannot be edited." });
         post.Content = request.Content.Trim();
         await db.SaveChangesAsync();
         return Ok(new { post.Id, post.Content });

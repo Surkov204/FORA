@@ -19,12 +19,6 @@ namespace FORA.Repositories
             return Task.CompletedTask;
         }
 
-        public Task AddPostMediaRangeAsync(IEnumerable<PostMedia> media)
-        {
-            _db.PostMedia.AddRange(media);
-            return Task.CompletedTask;
-        }
-
         public Task<Post?> GetPostByIdAsync(int postId)
         {
             return _db.Posts.FirstOrDefaultAsync(p => p.Id == postId);
@@ -32,15 +26,6 @@ namespace FORA.Repositories
 
         public Task DeletePostWithRelationsAsync(Post post)
         {
-            var comments = _db.Comments.Where(c => c.PostId == post.Id);
-            _db.Comments.RemoveRange(comments);
-
-            var likes = _db.PostLikes.Where(l => l.PostId == post.Id);
-            _db.PostLikes.RemoveRange(likes);
-
-            var media = _db.PostMedia.Where(m => m.PostId == post.Id);
-            _db.PostMedia.RemoveRange(media);
-
             _db.Posts.Remove(post);
             return Task.CompletedTask;
         }

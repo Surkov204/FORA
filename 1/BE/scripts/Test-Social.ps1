@@ -37,8 +37,10 @@ function ExpectStatus([int]$expected, [scriptblock]$operation) {
 }
 
 try {
+    # Fixture-only password for signing in through Chrome against the disposable database.
+    $passwordHash = if ($CheckUI) { '$2a$11$R11HWcPCb9ntlWVNGbZwduyS9A/xcBvczDUiJlmj.LC7TRCVcaeH.' } else { 'not-a-login-password' }
     foreach ($suffix in @('a','b')) {
-        $id = Sql "INSERT INTO Users (Email,PasswordHash,IsEmailVerified,CreatedAt) OUTPUT INSERTED.Id VALUES ('$marker-$suffix@example.invalid','not-a-login-password',1,SYSUTCDATETIME());"
+        $id = Sql "INSERT INTO Users (Email,PasswordHash,IsEmailVerified,CreatedAt) OUTPUT INSERTED.Id VALUES ('$marker-$suffix@example.invalid','$passwordHash',1,SYSUTCDATETIME());"
         $ids += [int]$id
         Sql "INSERT INTO UserProfiles (UserId,DisplayName,Bio,CreatedAt) VALUES ($id,'$marker-$suffix','Smoke test',SYSUTCDATETIME());" | Out-Null
     }
@@ -104,6 +106,68 @@ try {
     Api DELETE "/posts/$postId" $null $tokenB | Out-Null
     $saved = Api GET "/social/feed?tab=saved&q=$marker"
     Assert (@($saved.items).Count -eq 0) 'Delete cascades saved post'
+
+    $badPoll = @{ options = @('Same', ' same '); durationHours = 24 }
+    ExpectStatus 400 { Api POST '/posts' @{ content = "$marker invalid"; poll = $badPoll } }
+    ExpectStatus 401 { Api POST '/hubs/polls/negotiate?negotiateVersion=1' -bearer '' }
+    $pollPost = Api POST '/posts' @{
+        content = "$marker poll"
+        poll = @{ options = @('Library', 'Sports courts', 'Student network'); durationHours = 24 }
+    }
+    Assert ($pollPost.id -gt 0) 'Poll creation validates distinct options and requires authentication for live updates'
+    $pollPath = "/posts/$($pollPost.id)/poll"
+    ExpectStatus 409 { Api PUT "/social/posts/$($pollPost.id)" @{ content = 'Different poll question' } }
+    ExpectStatus 400 { Api PUT "$pollPath/vote" @{ optionNumber = 4 } }
+    ExpectStatus 401 { Api PUT "$pollPath/vote" @{ optionNumber = 1 } -bearer '' }
+    $vote = Api PUT "$pollPath/vote" @{ optionNumber = 2 }
+    $retry = Api PUT "$pollPath/vote" @{ optionNumber = 2 }
+    ExpectStatus 409 { Api PUT "$pollPath/vote" @{ optionNumber = 1 } }
+    Assert ($vote.myOption -eq 2 -and $retry.options[1].voteCount -eq 1) 'Vote is authenticated, idempotent, and immutable'
+    $otherView = Api GET $pollPath -bearer $tokenB
+    $profilePosts = Api GET "/profile/$($ids[0])/posts" -bearer $tokenB
+    $profilePoll = ($profilePosts | Where-Object { $_.id -eq $pollPost.id }).poll
+    Assert ($null -eq $otherView.myOption -and $null -ne $profilePoll -and
+        $profilePoll.options[1].voteCount -eq 1) 'Poll results omit other voters and appear on the profile'
+    Sql "UPDATE PostPolls SET ClosesAt = DATEADD(minute, -1, SYSDATETIMEOFFSET()) WHERE PostId = $($pollPost.id);" | Out-Null
+    ExpectStatus 409 { Api PUT "$pollPath/vote" @{ optionNumber = 1 } -bearer $tokenB }
+    Api DELETE "/posts/$($pollPost.id)" | Out-Null
+    ExpectStatus 404 { Api GET $pollPath }
+    Assert ((Sql "SELECT COUNT(*) FROM PostPollVotes WHERE PostId = $($pollPost.id);") -eq 0) 'Expired polls reject new votes and deleting a post removes its poll'
+
+    if ($CheckUI) {
+        Sql "UPDATE UserProfiles SET DisplayName = 'Minh' WHERE UserId = $($ids[0]); UPDATE UserProfiles SET DisplayName = 'Lan' WHERE UserId = $($ids[1]);" | Out-Null
+        @{ tokenA = $script:tokenA; tokenB = $tokenB; question = 'Which project should we choose?';
+            email = "$marker-a@example.invalid"; password = 'Fora-Disposable-UI!77' } |
+            ConvertTo-Json -Compress | node (Join-Path $PSScriptRoot 'Test-SocialUI.mjs')
+        if ($LASTEXITCODE -ne 0) { throw 'Browser poll or discussion verification failed' }
+    }
+
+    $discussion = Api POST '/posts' @{ content = "$marker discussion"; mediaUrls = @('https://example.invalid/image.png') }
+    $discussionId = $discussion.id
+    $root = (Api POST '/comments' @{ postId = $discussionId; content = 'Original comment' }).comment
+    $reply = (Api POST '/comments' @{ postId = $discussionId; parentCommentId = $root.id; content = 'Reply' } $tokenB).comment
+    ExpectStatus 400 { Api POST '/comments' @{ postId = $discussionId; parentCommentId = $reply.id; content = 'Too deep' } }
+    ExpectStatus 403 { Api PUT "/comments/$($root.id)" @{ content = 'Not the author' } $tokenB }
+    ExpectStatus 403 { Api DELETE "/comments/$($root.id)" $null $tokenB }
+    ExpectStatus 401 { Api DELETE "/comments/$($root.id)" $null '' }
+    $another = Api POST '/posts' @{ content = "$marker another discussion" }
+    ExpectStatus 400 { Api POST '/comments' @{ postId = $another.id; parentCommentId = $root.id; content = 'Wrong post' } }
+    ExpectStatus 404 { Api GET "/comments/post/$($another.id)/target/$($reply.id)" }
+    $edited = Api PUT "/comments/$($root.id)" @{ content = 'Edited comment' }
+    Assert ($edited.comment.editedAt -and $edited.comment.replyCount -eq 1) 'Only the author can edit a comment and reply depth and post scope are enforced'
+    $tombstone = Api DELETE "/comments/$($root.id)"
+    $target = Api GET "/comments/post/$discussionId/target/$($reply.id)"
+    Assert ($tombstone.total -eq 1 -and $target.root.isDeleted -and !$target.root.content -and
+        $target.root.userId -eq 0 -and $target.target.content -eq 'Reply') 'Deleting a root removes its content and identity while preserving the reply and direct link'
+    ExpectStatus 400 { Api POST '/comments' @{ postId = $discussionId; parentCommentId = $root.id; content = 'Closed thread' } }
+    $removed = Api DELETE "/comments/$($reply.id)" $null $tokenB
+    ExpectStatus 404 { Api GET "/comments/post/$discussionId/target/$($root.id)" }
+    $details = Api GET "/social/posts/$discussionId"
+    Assert ($removed.total -eq 0 -and !$removed.root -and $details.commentCount -eq 0) 'Deleting the last reply hides the deleted root and updates the post count'
+    Api POST "/likes/$discussionId" $null $tokenB | Out-Null
+    Api DELETE "/posts/$discussionId" | Out-Null
+    $remaining = Sql "SELECT (SELECT COUNT(*) FROM Comments WHERE PostId = $discussionId) + (SELECT COUNT(*) FROM PostLikes WHERE PostId = $discussionId) + (SELECT COUNT(*) FROM PostMedia WHERE PostId = $discussionId);"
+    Assert ($remaining -eq 0) 'Removing a post also removes its comment tree, likes and media'
 
     foreach ($number in 1..21) {
         Api POST '/posts' @{ content = "$marker page $number" } $tokenB | Out-Null

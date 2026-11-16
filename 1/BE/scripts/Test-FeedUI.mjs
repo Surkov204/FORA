@@ -7,6 +7,7 @@ import { tmpdir } from 'node:os';
 let input = '';
 for await (const chunk of process.stdin) input += chunk;
 const { token } = JSON.parse(input);
+const origin = process.env.FORA_UI_ORIGIN || 'http://127.0.0.1:5173';
 const chrome = process.env.CHROME_PATH || 'C:/Program Files/Google/Chrome/Application/chrome.exe';
 const profile = resolve(tmpdir(), `fora-ui-${Date.now()}`);
 const browser = spawn(chrome, ['--headless=new', '--disable-gpu', '--no-first-run', '--no-default-browser-check', '--remote-debugging-port=9338', `--user-data-dir=${profile}`, 'about:blank'], { windowsHide: true, stdio: 'ignore' });
@@ -41,7 +42,7 @@ try {
   await call('Page.enable');
   await call('Page.addScriptToEvaluateOnNewDocument', { source: `localStorage.setItem('token', ${JSON.stringify(token)})` });
   await call('Emulation.setDeviceMetricsOverride', { width: 1366, height: 1000, deviceScaleFactor: 1, mobile: false });
-  await call('Page.navigate', { url: 'http://127.0.0.1:5173/feed' });
+  await call('Page.navigate', { url: new URL('/feed', origin).href });
   let ready = false;
   for (let i = 0; i < 50; i++) {
     ready = await evaluate(`!!document.querySelector('.post-card') && !document.querySelector('.social-main [aria-busy="true"]')`);

@@ -1,5 +1,5 @@
 import { useMemo, useState, useEffect, useRef } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import "./auth.css";
 const API = "/api";
 const GOOGLE_REASON_TEXT = {
@@ -30,6 +30,8 @@ const mapGoogleReasonToMessage = (reason) => {
 
 export default function Auth() {
     const navigate = useNavigate();
+    const returnTo = useLocation().state?.returnTo;
+    const destination = typeof returnTo === "string" && /^\/posts\/\d+(?:\?[^#]*)?$/.test(returnTo) ? returnTo : "/feed";
 
     // tab: "login" | "register"
     const [tab, setTab] = useState("login");
@@ -172,7 +174,7 @@ export default function Auth() {
             localStorage.setItem("token", data.token);
             localStorage.setItem("currentUser", JSON.stringify(data.user));
             setToast("Đăng nhập OK ✅");
-            navigate("/feed");
+            navigate(destination, { replace: destination !== "/feed" });
         } catch {
             setServerError("Không kết nối được server");
         } finally {
@@ -340,7 +342,7 @@ export default function Auth() {
             localStorage.setItem("currentUser", JSON.stringify(data.user));
             setToast("Google login OK");
             pushGoogleDebug({ stage: "server_google_success", lastError: "" });
-            navigate("/feed");
+            navigate(destination, { replace: destination !== "/feed" });
         } catch (err) {
             setServerError("Khong ket noi duoc server");
             pushGoogleDebug({

@@ -6,6 +6,7 @@ import ForgotPassword from "./pages/ForgotPassword";
 import ResetPassword from "./pages/ResetPassword";
 import Home from "./pages/Home"
 import Feed from "./pages/Feed";
+import PostDetails from "./pages/PostDetails";
 
 
 function App() {
@@ -24,6 +25,7 @@ function App() {
       <Route path="/reset-password" element={<ResetPassword />} />
       <Route path="/home" element={<Home />} />
       <Route path="/feed" element={<Feed />} />
+      <Route path="/posts/:postId" element={<PostDetails />} />
 
       {/* Redirect tất cả về /auth */}
       <Route path="*" element={<Navigate to="/auth" replace />} />

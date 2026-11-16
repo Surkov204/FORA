@@ -1,48 +1,35 @@
+using System.Security.Claims;
 using FORA.DTOs;
 using FORA.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using System.Security.Claims;
 
-namespace FORA.Controllers
+namespace FORA.Controllers;
+
+[ApiController, Route("api/comments")]
+public sealed class CommentsController(ICommentService comments) : ControllerBase
 {
-    [Route("api/[controller]")]
-    [ApiController]
-    public class CommentsController : ControllerBase
-    {
-        private readonly ICommentService _commentService;
+    private int CurrentUserId => int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
 
-        public CommentsController(ICommentService commentService)
-        {
-            _commentService = commentService;
-        }
+    [Authorize, HttpPost]
+    public async Task<IActionResult> Create(CreateCommentDto request) =>
+        Respond(await comments.AddAsync(CurrentUserId, request));
 
-        [HttpPost]
-        [Authorize]
-        public async Task<IActionResult> CreateComment([FromBody] CreateCommentDto request)
-        {
-            if (!ModelState.IsValid)
-            {
-                return BadRequest(ModelState);
-            }
+    [Authorize, HttpPut("{commentId:int}")]
+    public async Task<IActionResult> Update(int commentId, UpdateCommentDto request) =>
+        Respond(await comments.UpdateAsync(CurrentUserId, commentId, request));
 
-            var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier);
-            var hasUserId = int.TryParse(userIdClaim?.Value, out var userId);
+    [Authorize, HttpDelete("{commentId:int}")]
+    public async Task<IActionResult> Delete(int commentId) =>
+        Respond(await comments.DeleteAsync(CurrentUserId, commentId));
 
-            var result = await _commentService.AddCommentAsync(hasUserId ? userId : null, request);
-            return ToActionResult(result);
-        }
+    [HttpGet("post/{postId:int}")]
+    public async Task<IActionResult> Page(int postId, int? parentCommentId, int? beforeId) =>
+        Respond(await comments.GetPageAsync(postId, parentCommentId, beforeId));
 
-        [HttpGet("post/{postId}")]
-        public async Task<IActionResult> GetCommentsByPost(int postId)
-        {
-            var result = await _commentService.GetCommentsByPostIdAsync(postId);
-            return ToActionResult(result);
-        }
+    [HttpGet("post/{postId:int}/target/{commentId:int}")]
+    public async Task<IActionResult> Target(int postId, int commentId) =>
+        Respond(await comments.GetTargetAsync(postId, commentId));
 
-        private IActionResult ToActionResult(ServiceResult result)
-        {
-            return StatusCode(result.StatusCode, result.Data);
-        }
-    }
+    private IActionResult Respond(ServiceResult result) => StatusCode(result.StatusCode, result.Data);
 }

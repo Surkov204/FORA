@@ -1,0 +1,137 @@
+.post-poll {
+  display: grid;
+  gap: 12px;
+  margin: 14px 0;
+  padding: 14px;
+  border: 1px solid #353449;
+  border-radius: 14px;
+  background: #171625;
+  color: #f3f0ff;
+}
+
+.poll-heading,
+.poll-summary,
+.poll-controls {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+
+.poll-heading > span,
+.poll-summary {
+  color: #c1bcd6;
+  font-size: 0.8rem;
+}
+
+.poll-heading > .poll-live {
+  color: #a2f3c9;
+}
+
+.poll-options {
+  display: grid;
+  gap: 8px;
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.poll-option {
+  position: relative;
+  isolation: isolate;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  min-height: 44px;
+  padding: 8px 12px;
+  border: 1px solid #514a6c;
+  border-radius: 9px;
+  overflow: hidden;
+  background: #211d34;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+}
+
+.poll-option:not(:disabled) {
+  cursor: pointer;
+}
+
+.post-poll .poll-option:disabled {
+  opacity: 1;
+  cursor: default;
+}
+
+.poll-option:not(:disabled):hover,
+.poll-option.selected {
+  border-color: #bca8ff;
+}
+
+.poll-option:focus-visible {
+  outline: 2px solid #cbb9ff;
+  outline-offset: 2px;
+}
+
+.poll-fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  z-index: -1;
+  background: #493471;
+  transition: width 260ms ease-out;
+}
+
+.poll-option.selected .poll-fill {
+  background: #59448b;
+}
+
+.poll-choice {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.poll-choice small {
+  color: #e2d7ff;
+}
+
+.poll-percent {
+  flex-shrink: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.poll-editor {
+  display: grid;
+  gap: 10px;
+  margin: 12px 0;
+  padding: 12px;
+  border: 1px solid #514a6c;
+  border-radius: 10px;
+}
+
+.poll-editor legend {
+  padding: 0 6px;
+}
+
+.poll-editor label {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+}
+
+.poll-editor input,
+.poll-editor select {
+  width: 100%;
+  min-height: 40px;
+  padding: 6px 10px;
+  border: 1px solid #514a6c;
+  border-radius: 8px;
+  background: #171625;
+  color: #f3f0ff;
+  font: inherit;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .poll-fill { transition: none; }
+}

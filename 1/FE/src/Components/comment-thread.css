@@ -1,0 +1,135 @@
+.comment-thread {
+  display: grid;
+  gap: 14px;
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border, #353535);
+  cursor: default;
+}
+
+.comment-thread h2 {
+  margin: 0;
+  font-size: 1.1rem;
+}
+
+.thread-composer,
+.thread-comment-header,
+.comment-tools {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.comment-tools {
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.comment-form {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  flex: 1;
+}
+
+.comment-form label {
+  display: grid;
+  gap: 5px;
+  font-size: .875rem;
+}
+
+.comment-form textarea {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 8px 10px;
+  border: 1px solid var(--border, #353535);
+  border-radius: 8px;
+  background: var(--bg-card, #16181c);
+  color: var(--text-main, #f2f3f5);
+  font: inherit;
+  resize: vertical;
+}
+
+.thread-root {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+.thread-comment {
+  padding: 12px;
+  border: 1px solid var(--border, #353535);
+  border-radius: 10px;
+  min-width: 0;
+}
+
+.thread-comment-header > div {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 8px;
+  overflow-wrap: anywhere;
+}
+
+.thread-meta,
+.thread-comment time {
+  color: #a5aab4;
+  font-size: .8rem;
+}
+
+.thread-text {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  margin: 8px 0 4px;
+}
+
+.thread-replies {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  margin-inline-start: clamp(8px, 3vw, 28px);
+  padding-inline-start: 10px;
+  border-inline-start: 2px solid var(--border, #353535);
+}
+
+.thread-action {
+  padding: 5px 4px;
+  border: 0;
+  background: transparent;
+  color: #83d0ff;
+  font: inherit;
+  font-size: .8rem;
+  cursor: pointer;
+}
+
+.thread-action:hover {
+  text-decoration: underline;
+}
+
+.thread-reply-toggle,
+.thread-replies > button,
+.comment-thread > button {
+  justify-self: start;
+}
+
+.thread-highlight {
+  border-color: #67bfff;
+  background: #10233a;
+}
+
+.thread-highlight:focus {
+  outline: 2px solid #67bfff;
+  outline-offset: 2px;
+}
+
+.post-details {
+  display: grid;
+  gap: 14px;
+  width: min(100% - 24px, 720px);
+  margin: 24px auto;
+}
+
+.post-details .p-content {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}

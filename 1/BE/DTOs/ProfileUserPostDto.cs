@@ -10,6 +10,7 @@ namespace FORA.DTOs
         public string UserDisplayName { get; set; } = string.Empty;
         public string? UserAvatar { get; set; }
         public bool IsLiked { get; set; }
+        public PostPollDto? Poll { get; set; }
         public List<ProfileUserPostMediaDto> Media { get; set; } = new();
     }
 

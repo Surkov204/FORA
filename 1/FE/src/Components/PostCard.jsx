@@ -1,32 +1,36 @@
+import { useState } from "react";
+import { Link } from "react-router-dom";
 import Avatar from "./Avatar";
 import CommentSection from "./CommentSection";
+import PostPoll from "./PostPoll";
 
 export default function PostCard({
   post,
   formatTime,
-  onToggleComments,
   onToggleLike,
-
-  // comment props
-  commentsOpen,
-  comments,
-  commentInputValue,
-  onCommentInputChange,
-  onSubmitComment,
+  viewerId,
+  targetCommentId,
+  openComments = false,
+  onCommentCountChange,
 
   currentUserAvatar,
   onDelete,
   onEdit,
   onBookmark,
   busy = false,
+  token,
+  pollLive,
 }) {
+  const [commentsOpen, setCommentsOpen] = useState(openComments);
   return (
     <div className="post-card" data-post-id={post.id}>
       <div className="p-header">
         <Avatar className="avatar-tiny" src={post.userAvatar} alt="u" />
         <div className="p-info">
           <span className="p-name">{post.userDisplayName || "User"}</span>
-          <span className="p-time">{formatTime(post.createdAt)}</span>
+          <Link className="p-time" to={`/posts/${post.id}`} aria-label="Open post">
+            {formatTime(post.createdAt)}
+          </Link>
         </div>
         {onEdit && <button className="act-btn" type="button" onClick={onEdit} aria-label="Edit post" disabled={busy}><i className="fa-solid fa-pen" /></button>}
         {onDelete && (
@@ -42,6 +46,7 @@ export default function PostCard({
       </div>
 
       <div className="p-content">{post.content}</div>
+      {post.poll && token && <PostPoll poll={post.poll} token={token} live={pollLive} />}
       {post.media && post.media.length > 0 && (
         <div className="post-media-grid">
           {post.media.map((m, idx) => {
@@ -60,7 +65,9 @@ export default function PostCard({
         <button
           className="act-btn comment"
           type="button"
-          onClick={() => onToggleComments(post.id)}
+          onClick={() => setCommentsOpen(!commentsOpen)}
+          aria-label={`Comments (${post.commentCount || 0})`}
+          aria-expanded={commentsOpen}
         >
           <i className="fa-regular fa-comment"></i>
           <span>{post.commentCount || 0}</span>
@@ -84,10 +91,11 @@ export default function PostCard({
 
       <CommentSection
         isOpen={commentsOpen}
-        comments={comments}
-        inputValue={commentInputValue}
-        onInputChange={onCommentInputChange}
-        onSubmit={onSubmitComment}
+        postId={post.id}
+        token={token}
+        viewerId={viewerId}
+        targetCommentId={targetCommentId}
+        onCountChange={onCommentCountChange}
         currentUserAvatar={currentUserAvatar}
         formatTime={formatTime}
       />

@@ -14,5 +14,6 @@ namespace FORA.Models
         public User User { get; set; } = null!;
         public ICollection<Comment> Comments { get; set; } = new List<Comment>();
         public ICollection<PostMedia> Media { get; set; } = new List<PostMedia>();
+        public PostPoll? Poll { get; set; }
     }
 }

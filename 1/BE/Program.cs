@@ -1,5 +1,7 @@
 using FORA.Data;
 using FORA.DTOs;
+using FORA.Hubs;
+using Microsoft.AspNetCore.Http.Connections;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.OData;
@@ -38,6 +40,7 @@ builder.Services.AddScoped<IProfileService, ProfileService>();
 // 🔹 ADD SWAGGER (THIẾU CÁI NÀY)
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
+builder.Services.AddSignalR();
 
 // 🔹 ADD DB CONTEXT
 builder.Services.AddDbContext<AppDbContext>(options =>
@@ -119,5 +122,10 @@ app.UseCors("ForaClient");
 app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();
+app.MapHub<PostPollHub>("/api/hubs/polls", options =>
+{
+    options.Transports = HttpTransportType.LongPolling;
+    options.CloseOnAuthenticationExpiration = true;
+});
 // app.MapFallbackToFile("login.html");
 app.Run();

@@ -1,33 +1,12 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import "./profile.css";
 import PostCard from "../Components/PostCard";
+import { useLivePolls } from "../hooks/useLivePolls";
+import { session } from "../session";
 import { Link } from "react-router-dom";
 
 const API = "/api"; // dùng proxy vite -> backend 5106
-
-function decodeJwt(token) {
-    try {
-        const payload = token.split(".")[1];
-        return JSON.parse(atob(payload));
-    } catch {
-        return null;
-    }
-}
-
-function getUserFromToken() {
-    const token = localStorage.getItem("token");
-    if (!token) return null;
-
-    const decoded = decodeJwt(token);
-    if (!decoded) return null;
-
-    return {
-        userId: decoded["http://schemas.xmlsoap.org/ws/2005/05/identity/claims/nameidentifier"],
-        email: decoded["http://schemas.xmlsoap.org/ws/2005/05/identity/claims/emailaddress"],
-        role: decoded["http://schemas.microsoft.com/ws/2008/06/identity/claims/role"],
-    };
-}
 
 function formatTime(dateStr) {
     const d = new Date(dateStr);
@@ -50,15 +29,14 @@ export default function Profile() {
     const fileInputRef = useRef(null);
     const postMediaInputRef = useRef(null);
 
-    const token = useMemo(() => localStorage.getItem("token"), []);
-    const userFromToken = useMemo(() => getUserFromToken(), []);
+    const [auth] = useState(session);
+    const token = auth?.token;
+    const userId = auth?.id;
+    const pollLive = useLivePolls(token);
 
-    // Nếu chưa login -> đá về login
     useEffect(() => {
-        if (!token || !userFromToken?.userId) navigate("/login");
-    }, [token, userFromToken, navigate]);
-
-    const userId = userFromToken?.userId;
+        if (!auth) navigate("/auth", { replace: true });
+    }, [auth, navigate]);
 
     // ===== state =====
     const [profile, setProfile] = useState(() => {
@@ -89,9 +67,6 @@ export default function Profile() {
     const [loadingProfile, setLoadingProfile] = useState(false);
     const [loadingPosts, setLoadingPosts] = useState(false);
 
-    const [openComments, setOpenComments] = useState(() => ({})); // {postId: true/false}
-    const [commentsByPost, setCommentsByPost] = useState(() => ({})); // {postId: comments[]}
-    const [commentInputByPost, setCommentInputByPost] = useState(() => ({})); // {postId: "text"}
     const [deleteTargetId, setDeleteTargetId] = useState(null);
     const [deleteLoading, setDeleteLoading] = useState(false);
     const [avatarMenuOpen, setAvatarMenuOpen] = useState(false);
@@ -381,75 +356,6 @@ export default function Profile() {
         );
     };
 
-    // ===== COMMENTS =====
-    const toggleComments = async (postId) => {
-        setOpenComments((prev) => {
-            const nextOpen = !prev[postId];
-            return { ...prev, [postId]: nextOpen };
-        });
-
-        // nếu đang mở thì load comments
-        const isOpening = !openComments[postId];
-        if (isOpening) {
-            await loadComments(postId);
-        }
-    };
-
-    const loadComments = async (postId) => {
-        try {
-            const res = await fetch(`${API}/comments/post/${postId}`, {
-                // nếu API comments không cần token thì để {} cũng được
-                headers: token ? { Authorization: `Bearer ${token}` } : {},
-            });
-
-            if (!res.ok) throw new Error("Load comment failed");
-
-            const comments = await res.json();
-            setCommentsByPost((prev) => ({ ...prev, [postId]: comments }));
-        } catch (e) {
-            console.error(e);
-            setCommentsByPost((prev) => ({ ...prev, [postId]: [] }));
-        }
-    };
-
-    const submitComment = async (postId) => {
-        const content = (commentInputByPost[postId] || "").trim();
-        if (!content) return;
-
-        try {
-            const res = await fetch(`${API}/comments`, {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                    Authorization: `Bearer ${token}`,
-                },
-                body: JSON.stringify({ postId, content }),
-            });
-
-            if (!res.ok) {
-                alert("Comment failed!");
-                return;
-            }
-
-            // clear input
-            setCommentInputByPost((prev) => ({ ...prev, [postId]: "" }));
-
-            // reload list
-            await loadComments(postId);
-
-            // tăng commentCount ngoài post
-            setPosts((prev) =>
-                prev.map((p) =>
-                    p.id === postId ? { ...p, commentCount: (p.commentCount || 0) + 1 } : p
-                )
-            );
-        } catch (e) {
-            console.error(e);
-            alert("Error sending comment");
-        }
-    };
-
-
     if (!profile) {
         return (
             <div style={{ padding: 20, color: "#fff" }}>
@@ -636,16 +542,13 @@ export default function Profile() {
                             <PostCard
                                 key={post.id}
                                 post={post}
+                                token={token}
+                                pollLive={pollLive}
                                 formatTime={formatTime}
-                                onToggleComments={toggleComments}
                                 onToggleLike={toggleLike}
-                                commentsOpen={!!openComments[post.id]}
-                                comments={commentsByPost[post.id] || []}
-                                commentInputValue={commentInputByPost[post.id] || ""}
-                                onCommentInputChange={(text) =>
-                                    setCommentInputByPost((prev) => ({ ...prev, [post.id]: text }))
-                                }
-                                onSubmitComment={() => submitComment(post.id)}
+                                viewerId={userId}
+                                onCommentCountChange={commentCount => setPosts(previous =>
+                                    previous.map(item => item.id === post.id ? { ...item, commentCount } : item))}
                                 currentUserAvatar={avatar}
                                 onDelete={() => requestDelete(post.id)}
                             />

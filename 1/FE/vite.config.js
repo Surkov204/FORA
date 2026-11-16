@@ -1,5 +1,6 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
+import { env } from "node:process";
 
 export default defineConfig({
   plugins: [react()],
@@ -7,7 +8,7 @@ export default defineConfig({
     port: 5173,
     proxy: {
       "/api": {
-        target: "http://localhost:5106", // ⚠️ đổi đúng port API
+        target: env.FORA_API_URL || "http://localhost:5106",
         changeOrigin: true,
         secure: false,
       },

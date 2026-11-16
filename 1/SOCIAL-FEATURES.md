@@ -8,6 +8,7 @@ The active application is `BE/` + `FE/`. Sign-in now opens `/feed`.
 - Discover people by display name; follow/unfollow and follower/following counts.
 - Following feed and private saved-post collection.
 - Create posts, like, comment, edit your own post content, and confirm deletion.
+- Create a poll with two to four choices and see votes update live.
 - Existing profile styling, buttons, cards, avatar components, and mobile layout.
 
 ## Start
@@ -56,12 +57,43 @@ Authorization: Bearer <token>
 The schema at `/odata/$metadata` exposes the fields available for post queries.
 Use `/api/social/feed` for the personalized following and saved feeds.
 
+## Live polls
+
+Select **Create poll** in the feed composer, enter a question and two to four
+distinct choices, then pick a duration of one hour or one, three, or seven days.
+The question and choices are fixed after publishing. Each signed-in account
+can cast one vote. Everyone viewing a poll sees its aggregate results, and only
+the voter sees which option they selected.
+
+To demo, open the feed in two browser sessions with different accounts. Create
+a poll in the first session, refresh the second to discover the new post, then
+vote. Each session receives later vote totals without refreshing.
+
+## Post discussions
+
+Open a discussion inline with the comment button, or click the post timestamp
+to visit its page. Replies stay one level deep. Replying to an existing reply
+prefills the author's name and adds the new reply to the same thread. Authors
+can edit or delete their own comments. A deleted root with active replies
+displays **Comment deleted** and retains the replies.
+
+Root comments and each thread's replies load in pages of 10. The comments API
+returns `items`, `nextBeforeId`, and the post's `total` for
+`GET /api/comments/post/{postId}`. Pass `parentCommentId` to page a thread.
+Use **Link** on a comment to open it directly, including older replies outside
+the first page.
+
 ## Database
 
 Migration `AddSocialFeed` adds `UserFollows` and `PostBookmarks` with composite
 keys and foreign keys. It also brings the existing `PostLikes` foreign keys
 into sync with the model, using `NoAction` on the user relation to avoid SQL
 Server multiple cascade paths. Deleting a post also deletes its bookmarks.
+Migration `AddPostPolls` adds polls, choices, and votes. The vote key enforces
+one vote per account per poll. Deleting the post also removes its poll and
+votes.
+Migration `AddCommentThreads` adds reply relationships and edit/delete
+timestamps. Existing comments become root comments.
 
 ## Verification
 
@@ -75,7 +107,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File ./1/BE/scripts/Test-Social.p
 
 The integration check creates two temporary accounts, uses short-lived test
 JWTs, verifies OData authentication and queries, search, following, bookmarks,
-ownership, pagination validation, and deletion, then removes its test records.
+ownership, pagination validation, deletion, comment rules, and poll rules, then removes its test records.
 It requires Windows SQL access.
 
 Optional Windows Chrome UI check (frontend must also be running):
@@ -84,7 +116,12 @@ Optional Windows Chrome UI check (frontend must also be running):
 powershell -NoProfile -ExecutionPolicy Bypass -File ./1/BE/scripts/Test-Social.ps1 -CheckUI
 ```
 
-This verifies desktop/mobile rendering and writes ignored screenshots under
-`.qa/`. Set `CHROME_PATH` if Chrome is installed in another location.
+This verifies desktop/mobile rendering, synchronized vote results between two
+browser sessions, vote persistence across reload, concurrent-vote handling, and
+discussion replies, pagination, direct links, edits, and deletion.
+It writes ignored screenshots under `.qa/`. Set `CHROME_PATH` if Chrome is
+installed elsewhere. For alternate local ports, set `FORA_API_URL` before
+launching Vite, set `FORA_UI_ORIGIN` before running the test, and pass the API
+URL as `-BaseUrl` to the test script.
 
 Chat, notifications, file uploads, and SMTP repairs are outside this feature set.
